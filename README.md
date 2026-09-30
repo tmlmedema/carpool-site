@@ -55,7 +55,7 @@ Locally there's no email: after you enter your email, an **open sign-in link** a
 
 ## How it works
 
-- **Sign-in:** one-time link, valid 20 minutes, rate-limited to 5 per email per hour. Sessions last 60 days in an HttpOnly cookie signed with `SESSION_SECRET`. The form gives the same answer whether or not an email is on the list.
+- **Sign-in:** one-time link, valid 20 minutes, emailed only to admins and parents listed in Admin; any other email is told it isn't on the parent list and nothing is sent. Sessions last 60 days in an HttpOnly cookie signed with `SESSION_SECRET`.
 - **Permissions (enforced in `lib/server/api.ts`):** parents change only their own child's rides and address. Any parent can **I can drive** and add kids who still need a ride to their car, and can change or remove only their own car. Admins can edit everything, including **+ Add another driver** for someone who offered by text.
 - **Addresses:** visible only to the child's parents, admins, and drivers who have that child in their car (**Addresses & contacts** on the car, with Google Maps links).
 - **"Still needs a ride"** = children whose ride needs include that leg, minus children already in a car. **Driver needed** shows when those kids outnumber open seats.

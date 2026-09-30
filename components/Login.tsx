@@ -9,7 +9,7 @@ const LOGIN_MESSAGES: Record<string, string> = {
   denied: "That email isn't on the parent list. Ask the carpool coordinator to add you.",
 };
 
-interface LoginResult { ok: boolean; devLink?: string; devNotListed?: boolean }
+interface LoginResult { ok: boolean; devLink?: string }
 
 export default function Login() {
   const { refresh } = usePortal();
@@ -57,7 +57,7 @@ export default function Login() {
           {err && <div className="notice error">{err}</div>}
           {result && (
             <>
-              <div className="notice">Check your inbox. If <b>{sentTo}</b> is on the parent list, a sign-in link is on its way. It expires in 20 minutes.</div>
+              <div className="notice">Check your inbox. A sign-in link is on its way to <b>{sentTo}</b>. It expires in 20 minutes.</div>
               {result.devLink && (
                 <p className="muted">
                   Local preview:{" "}
@@ -72,9 +72,6 @@ export default function Login() {
                     }}
                   >open sign-in link</a>
                 </p>
-              )}
-              {result.devNotListed && (
-                <div className="notice error">Local preview: <b>{sentTo}</b> isn&apos;t on the parent list, so there&apos;s no link. Sign in with an admin email, then add this email on the Admin page.</div>
               )}
             </>
           )}

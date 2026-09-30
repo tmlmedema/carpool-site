@@ -108,23 +108,13 @@ export async function handle(req: Request): Promise<Response> {
   if (route === "/login" && method === "POST") {
     const email = normEmail(body.email);
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return fail(400, "Please enter a valid email address.");
-    // Simple rate limit: 5 links per email per hour.
-    const rlKey = `ratelimit/${email}`;
-    const recent = ((await s.get<number[]>(rlKey)) || []).filter((t) => Date.now() - t < 3600e3);
-    if (recent.length >= 5) return fail(429, "Too many sign-in links requested. Please try again in an hour.");
-    await s.set(rlKey, [...recent, Date.now()]);
-    let devLink: string | undefined;
-    if (isAllowed(cfg, email)) {
-      const vercelUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "";
-      const base = (process.env.SITE_URL || process.env.URL || vercelUrl || url.origin).replace(/\/$/, "");
-      const link = `${base}/api/verify?t=${makeLinkToken(email)}`;
-      await sendMagicLink(email, link, cfg);
-      if (showDevLink()) devLink = link;
-    }
-    // Same answer either way, so the form doesn't reveal who is on the list.
-    // (Local preview only: say when an email isn't on the list, since no email is sent.)
-    const devNotListed = showDevLink() && !devLink ? true : undefined;
-    return json({ ok: true, devLink, devNotListed });
+    // Only admins and parents listed in Admin can sign in; nobody else is sent an email.
+    if (!isAllowed(cfg, email)) return fail(403, "That email isn't on the parent list. Ask the carpool coordinator to add you.");
+    const vercelUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "";
+    const base = (process.env.SITE_URL || process.env.URL || vercelUrl || url.origin).replace(/\/$/, "");
+    const link = `${base}/api/verify?t=${makeLinkToken(email)}`;
+    await sendMagicLink(email, link, cfg);
+    return json({ ok: true, devLink: showDevLink() ? link : undefined });
   }
 
   if (route === "/verify" && method === "GET") {
