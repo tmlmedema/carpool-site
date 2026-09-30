@@ -1,0 +1,834 @@
+{
+  "id": "f434cc45-2a1f-4f56-8947-286b0df2ee13",
+  "prevId": "09af32e7-8825-4361-bb6d-64ec3f5226a7",
+  "version": "6",
+  "dialect": "sqlite",
+  "tables": {
+    "carpool_members": {
+      "name": "carpool_members",
+      "columns": {
+        "carpool_id": {
+          "name": "carpool_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "role": {
+          "name": "role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'parent'"
+        }
+      },
+      "indexes": {
+        "carpool_members_email_idx": {
+          "name": "carpool_members_email_idx",
+          "columns": [
+            "email"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "carpool_members_carpool_id_carpools_id_fk": {
+          "name": "carpool_members_carpool_id_carpools_id_fk",
+          "tableFrom": "carpool_members",
+          "columnsFrom": [
+            "carpool_id"
+          ],
+          "tableTo": "carpools",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {
+        "carpool_members_carpool_id_email_pk": {
+          "columns": [
+            "carpool_id",
+            "email"
+          ],
+          "name": "carpool_members_carpool_id_email_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "carpool_members_role_check": {
+          "name": "carpool_members_role_check",
+          "value": "role in ('admin', 'parent')"
+        }
+      }
+    },
+    "carpools": {
+      "name": "carpools",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "school": {
+          "name": "school",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        },
+        "rehearsal_note": {
+          "name": "rehearsal_note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        },
+        "dropoff_note": {
+          "name": "dropoff_note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        },
+        "pickup_note": {
+          "name": "pickup_note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "drivers": {
+      "name": "drivers",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "rehearsal_id": {
+          "name": "rehearsal_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "leg": {
+          "name": "leg",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "seats": {
+          "name": "seats",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "drivers_rehearsal_leg_user_unique": {
+          "name": "drivers_rehearsal_leg_user_unique",
+          "columns": [
+            "rehearsal_id",
+            "leg",
+            "user_id"
+          ],
+          "isUnique": true
+        },
+        "drivers_id_rehearsal_leg_unique": {
+          "name": "drivers_id_rehearsal_leg_unique",
+          "columns": [
+            "id",
+            "rehearsal_id",
+            "leg"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "drivers_rehearsal_id_rehearsals_id_fk": {
+          "name": "drivers_rehearsal_id_rehearsals_id_fk",
+          "tableFrom": "drivers",
+          "columnsFrom": [
+            "rehearsal_id"
+          ],
+          "tableTo": "rehearsals",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        },
+        "drivers_user_id_users_id_fk": {
+          "name": "drivers_user_id_users_id_fk",
+          "tableFrom": "drivers",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "tableTo": "users",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "drivers_leg_check": {
+          "name": "drivers_leg_check",
+          "value": "leg in ('dropoff', 'pickup')"
+        },
+        "drivers_seats_check": {
+          "name": "drivers_seats_check",
+          "value": "seats between 1 and 8"
+        }
+      }
+    },
+    "important_dates": {
+      "name": "important_dates",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "carpool_id": {
+          "name": "carpool_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "date": {
+          "name": "date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "detail": {
+          "name": "detail",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        }
+      },
+      "indexes": {
+        "important_dates_carpool_date_idx": {
+          "name": "important_dates_carpool_date_idx",
+          "columns": [
+            "carpool_id",
+            "date"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "important_dates_carpool_id_carpools_id_fk": {
+          "name": "important_dates_carpool_id_carpools_id_fk",
+          "tableFrom": "important_dates",
+          "columnsFrom": [
+            "carpool_id"
+          ],
+          "tableTo": "carpools",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "important_dates_date_check": {
+          "name": "important_dates_date_check",
+          "value": "date glob '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'"
+        }
+      }
+    },
+    "kid_guardians": {
+      "name": "kid_guardians",
+      "columns": {
+        "kid_id": {
+          "name": "kid_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "carpool_id": {
+          "name": "carpool_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "kid_guardians_email_idx": {
+          "name": "kid_guardians_email_idx",
+          "columns": [
+            "email"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "kid_guardians_kid_id_carpool_id_kids_id_carpool_id_fk": {
+          "name": "kid_guardians_kid_id_carpool_id_kids_id_carpool_id_fk",
+          "tableFrom": "kid_guardians",
+          "columnsFrom": [
+            "kid_id",
+            "carpool_id"
+          ],
+          "tableTo": "kids",
+          "columnsTo": [
+            "id",
+            "carpool_id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        },
+        "kid_guardians_carpool_id_email_carpool_members_carpool_id_email_fk": {
+          "name": "kid_guardians_carpool_id_email_carpool_members_carpool_id_email_fk",
+          "tableFrom": "kid_guardians",
+          "columnsFrom": [
+            "carpool_id",
+            "email"
+          ],
+          "tableTo": "carpool_members",
+          "columnsTo": [
+            "carpool_id",
+            "email"
+          ],
+          "onUpdate": "cascade",
+          "onDelete": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {
+        "kid_guardians_kid_id_email_pk": {
+          "columns": [
+            "kid_id",
+            "email"
+          ],
+          "name": "kid_guardians_kid_id_email_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "kids": {
+      "name": "kids",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "carpool_id": {
+          "name": "carpool_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "kids_carpool_idx": {
+          "name": "kids_carpool_idx",
+          "columns": [
+            "carpool_id"
+          ],
+          "isUnique": false
+        },
+        "kids_id_carpool_unique": {
+          "name": "kids_id_carpool_unique",
+          "columns": [
+            "id",
+            "carpool_id"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "kids_carpool_id_carpools_id_fk": {
+          "name": "kids_carpool_id_carpools_id_fk",
+          "tableFrom": "kids",
+          "columnsFrom": [
+            "carpool_id"
+          ],
+          "tableTo": "carpools",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "need_overrides": {
+      "name": "need_overrides",
+      "columns": {
+        "kid_id": {
+          "name": "kid_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "rehearsal_id": {
+          "name": "rehearsal_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "need": {
+          "name": "need",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "need_overrides_kid_id_kids_id_fk": {
+          "name": "need_overrides_kid_id_kids_id_fk",
+          "tableFrom": "need_overrides",
+          "columnsFrom": [
+            "kid_id"
+          ],
+          "tableTo": "kids",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        },
+        "need_overrides_rehearsal_id_rehearsals_id_fk": {
+          "name": "need_overrides_rehearsal_id_rehearsals_id_fk",
+          "tableFrom": "need_overrides",
+          "columnsFrom": [
+            "rehearsal_id"
+          ],
+          "tableTo": "rehearsals",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {
+        "need_overrides_kid_id_rehearsal_id_pk": {
+          "columns": [
+            "kid_id",
+            "rehearsal_id"
+          ],
+          "name": "need_overrides_kid_id_rehearsal_id_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "need_overrides_need_check": {
+          "name": "need_overrides_need_check",
+          "value": "need in ('both', 'dropoff', 'pickup', 'none')"
+        }
+      }
+    },
+    "rehearsals": {
+      "name": "rehearsals",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "carpool_id": {
+          "name": "carpool_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "date": {
+          "name": "date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "note": {
+          "name": "note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'scheduled'"
+        }
+      },
+      "indexes": {
+        "rehearsals_carpool_date_unique": {
+          "name": "rehearsals_carpool_date_unique",
+          "columns": [
+            "carpool_id",
+            "date"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "rehearsals_carpool_id_carpools_id_fk": {
+          "name": "rehearsals_carpool_id_carpools_id_fk",
+          "tableFrom": "rehearsals",
+          "columnsFrom": [
+            "carpool_id"
+          ],
+          "tableTo": "carpools",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "rehearsals_date_check": {
+          "name": "rehearsals_date_check",
+          "value": "date glob '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'"
+        },
+        "rehearsals_status_check": {
+          "name": "rehearsals_status_check",
+          "value": "status in ('scheduled', 'needs_confirmation', 'cancelled')"
+        }
+      }
+    },
+    "ride_assignments": {
+      "name": "ride_assignments",
+      "columns": {
+        "driver_id": {
+          "name": "driver_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "rehearsal_id": {
+          "name": "rehearsal_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "leg": {
+          "name": "leg",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "kid_id": {
+          "name": "kid_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "ride_assignments_one_car_per_leg": {
+          "name": "ride_assignments_one_car_per_leg",
+          "columns": [
+            "rehearsal_id",
+            "leg",
+            "kid_id"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "ride_assignments_kid_id_kids_id_fk": {
+          "name": "ride_assignments_kid_id_kids_id_fk",
+          "tableFrom": "ride_assignments",
+          "columnsFrom": [
+            "kid_id"
+          ],
+          "tableTo": "kids",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        },
+        "ride_assignments_driver_id_rehearsal_id_leg_drivers_id_rehearsal_id_leg_fk": {
+          "name": "ride_assignments_driver_id_rehearsal_id_leg_drivers_id_rehearsal_id_leg_fk",
+          "tableFrom": "ride_assignments",
+          "columnsFrom": [
+            "driver_id",
+            "rehearsal_id",
+            "leg"
+          ],
+          "tableTo": "drivers",
+          "columnsTo": [
+            "id",
+            "rehearsal_id",
+            "leg"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {
+        "ride_assignments_driver_id_kid_id_pk": {
+          "columns": [
+            "driver_id",
+            "kid_id"
+          ],
+          "name": "ride_assignments_driver_id_kid_id_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "users": {
+      "name": "users",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "emailVerified": {
+          "name": "emailVerified",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "image": {
+          "name": "image",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "phone": {
+          "name": "phone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "users_email_unique": {
+          "name": "users_email_unique",
+          "columns": [
+            "email"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "usual_needs": {
+      "name": "usual_needs",
+      "columns": {
+        "kid_id": {
+          "name": "kid_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "weekday": {
+          "name": "weekday",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "need": {
+          "name": "need",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "usual_needs_kid_id_kids_id_fk": {
+          "name": "usual_needs_kid_id_kids_id_fk",
+          "tableFrom": "usual_needs",
+          "columnsFrom": [
+            "kid_id"
+          ],
+          "tableTo": "kids",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {
+        "usual_needs_kid_id_weekday_pk": {
+          "columns": [
+            "kid_id",
+            "weekday"
+          ],
+          "name": "usual_needs_kid_id_weekday_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "usual_needs_weekday_check": {
+          "name": "usual_needs_weekday_check",
+          "value": "weekday between 0 and 6"
+        },
+        "usual_needs_need_check": {
+          "name": "usual_needs_need_check",
+          "value": "need in ('both', 'dropoff', 'pickup', 'none')"
+        }
+      }
+    }
+  },
+  "views": {},
+  "enums": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  },
+  "internal": {
+    "indexes": {}
+  }
+}

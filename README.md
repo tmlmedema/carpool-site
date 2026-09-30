@@ -26,6 +26,25 @@ rm -rf .localdata && ADMIN_EMAILS=jill@snacksdesign.com npm run dev
 npm test          # in a second terminal (set BASE=http://localhost:PORT if not 3000)
 ```
 
+## Database (Turso)
+
+The app is moving from the key-value store in `lib/store.js` to Turso (libSQL) with Drizzle. The schema is in place; the pages don't read from it yet.
+
+- `lib/db/schema.ts`: tables and constraints. The database itself enforces the ride rules: one car per kid per leg, seat limits (triggers in `drizzle/0001_seat_limit_triggers.sql`), and guardians must be carpool members.
+- `drizzle/`: migrations. After changing the schema, run `npm run db:generate` and commit the new files.
+- `lib/db/seed-carpool.ts`: loads the Google Sheet data from `lib/seed.js`.
+
+Locally, `.env.development` points at a SQLite file (`local.db`):
+
+```
+npm run db:migrate                                  # create/update the tables
+ADMIN_EMAILS=you@example.com npm run db:seed        # load the seed data (add -- --reset to start over)
+npm run db:studio                                   # browse the data
+npm run test:db                                     # schema and constraint tests
+```
+
+For the real database, put `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` in `.env.production.local` and run the same commands with `NODE_ENV=production` in front.
+
 ## Deploy to Vercel
 
 1. **Import the GitHub repo** in Vercel. It detects Next.js automatically, so no build settings are needed.
