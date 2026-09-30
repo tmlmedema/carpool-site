@@ -2,7 +2,7 @@
 
 Parent portal for the Park View Elementary 4th Grade Band carpool. Parents sign in with a one-time email link, set their child's ride needs, and sign up to drive to rehearsals at Glenn Westlake Middle School.
 
-Built with **Next.js (App Router) + TypeScript + React**. Hosted on **Vercel**, with data in **Upstash Redis** (free tier) and sign-in emails through **Resend**.
+Built with **Next.js (App Router) + TypeScript + React**. Hosted on **Vercel**, with data in **Turso** (free tier) and sign-in emails through **Resend**.
 
 ## Project layout
 
@@ -20,7 +20,7 @@ components/             Shell (header, account menu, phone menu, footer), Login,
 lib/
   types.ts              shared types
   client/               browser helpers: portal context (state, toasts, dialogs), date formatting
-  server/               api.ts (routes + permissions), auth.ts (signed tokens), store.ts (Redis / local files), seed.ts (starting data from the Google Sheet)
+  server/               api.ts (routes + permissions), auth.ts (signed tokens), store.ts (Turso / local files), seed.ts (starting data from the Google Sheet)
 test/api.test.mjs       API permission checks
 ```
 
@@ -37,11 +37,14 @@ Locally there's no email: after you enter your email, an **open sign-in link** a
 ## Deploy on Vercel
 
 1. **Import the repo** in Vercel (Add New → Project). It detects Next.js automatically.
-2. **Add storage:** Storage (or Marketplace) → **Upstash for Redis** → create a free database → connect it to this project. That sets `KV_REST_API_URL` and `KV_REST_API_TOKEN`.
+2. **Create a Turso database** (`brew install tursodatabase/tap/turso`, then `turso auth login`):
+   `turso db create band-carpool`, then get its URL with `turso db show band-carpool --url` and a token with `turso db tokens create band-carpool`. The app creates its table on first use.
 3. **Environment variables** (see `.env.example`):
 
    | Name | Value |
    |---|---|
+   | `TURSO_DATABASE_URL` | `libsql://band-carpool-<you>.turso.io` |
+   | `TURSO_AUTH_TOKEN` | the token from `turso db tokens create` |
    | `SESSION_SECRET` | 32+ random characters (`openssl rand -hex 32`) |
    | `ADMIN_EMAILS` | `jill@snacksdesign.com` (comma separated) |
    | `RESEND_API_KEY` | from resend.com, after verifying your sending domain |

@@ -44,3 +44,9 @@ next-env.d.ts
 .localdata/
 
 !.env.example
+
+# local SQLite (TURSO_DATABASE_URL=file:local.db)
+*.db
+*.db-journal
+*.db-wal
+*.db-shm

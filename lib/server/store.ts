@@ -1,9 +1,10 @@
 // Storage for the carpool data. Everything is small JSON documents stored by key.
 //
-//  - On Vercel: Upstash Redis. Add "Upstash for Redis" from the Vercel Marketplace and
-//    connect it to the project; it sets KV_REST_API_URL and KV_REST_API_TOKEN.
-//  - When developing locally (no Redis settings): JSON files in ./.localdata
+//  - On Vercel: Turso. Set TURSO_DATABASE_URL and TURSO_AUTH_TOKEN; the table is created on first use.
+//  - Upstash Redis also works (KV_REST_API_URL and KV_REST_API_TOKEN), if Turso isn't set.
+//  - When developing locally (no database settings): JSON files in ./.localdata
 import "server-only";
+import { createClient } from "@libsql/client";
 import fs from "node:fs/promises";
 import path from "node:path";
 
@@ -48,6 +49,25 @@ function redisStore(url: string, token: string): Store {
   };
 }
 
+// Turso (libSQL): one table of key -> JSON text.
+function tursoStore(url: string, authToken?: string): Store {
+  const db = createClient({ url, authToken });
+  let ready: Promise<unknown> | null = null;
+  const init = () => (ready ??= db.execute("CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL)").catch((err) => { ready = null; throw err; }));
+  return {
+    async get<T>(key: string) {
+      await init();
+      const { rows } = await db.execute({ sql: "SELECT value FROM kv WHERE key = ?", args: [key] });
+      return rows.length ? (JSON.parse(String(rows[0].value)) as T) : null;
+    },
+    async set(key, value) {
+      await init();
+      await db.execute({ sql: "INSERT INTO kv (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value", args: [key, JSON.stringify(value)] });
+    },
+    async del(key) { await init(); await db.execute({ sql: "DELETE FROM kv WHERE key = ?", args: [key] }); },
+  };
+}
+
 let cached: Store | null = null;
 
 export function store(): Store {
@@ -55,8 +75,9 @@ export function store(): Store {
   const e = process.env;
   const url = e.KV_REST_API_URL || e.UPSTASH_REDIS_REST_URL;
   const token = e.KV_REST_API_TOKEN || e.UPSTASH_REDIS_REST_TOKEN;
-  if (url && token) cached = redisStore(url, token);
+  if (e.TURSO_DATABASE_URL) cached = tursoStore(e.TURSO_DATABASE_URL, e.TURSO_AUTH_TOKEN);
+  else if (url && token) cached = redisStore(url, token);
   else if (e.NODE_ENV !== "production" || e.LOCAL_STORE_DIR) cached = fileStore(e.LOCAL_STORE_DIR || path.join(process.cwd(), ".localdata"));
-  else throw new Error("No database configured. On Vercel, connect Upstash for Redis to this project (it sets KV_REST_API_URL and KV_REST_API_TOKEN).");
+  else throw new Error("No database configured. In Vercel, set TURSO_DATABASE_URL and TURSO_AUTH_TOKEN (Settings → Environment Variables), then redeploy.");
   return cached;
 }
