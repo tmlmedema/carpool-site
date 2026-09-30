@@ -1,15 +1,13 @@
-// Every /api/* request goes through the router in lib/api.js.
-import { handle } from "@/lib/api";
+// Every /api/* request (login, rides, admin, ...) is handled by lib/server/api.ts.
+import { handle } from "@/lib/server/api";
 
-export const dynamic = "force-dynamic";
-
-async function route(req: Request): Promise<Response> {
+async function handler(request: Request) {
   try {
-    return await handle(req);
+    return await handle(request);
   } catch (err) {
     console.error(err);
     return Response.json({ error: "Something went wrong. Please try again." }, { status: 500 });
   }
 }
 
-export { route as GET, route as POST };
+export { handler as GET, handler as POST };

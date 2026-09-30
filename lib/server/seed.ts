@@ -2,11 +2,14 @@
 // This is loaded once, the first time the site runs. After that, edit everything
 // from the Admin page on the site.
 
-const d = (id, weekday, note = "", flag = "") => ({ id, weekday, note, flag });
+import type { Config, KidNeeds, Ride, RehearsalDate } from "../types";
 
-export const SEED_CONFIG = {
+const d = (id: string, weekday: string, note = "", flag: RehearsalDate["flag"] = ""): RehearsalDate => ({ id, weekday, note, flag });
+
+export const SEED_CONFIG: Config = {
   title: "4th Grade Band Carpool",
-  school: "Glenn Westlake Middle School",
+  school: "Park View Elementary School",
+  location: "Glenn Westlake Middle School",
   rehearsal: "Rehearsal 4:00–5:00 PM",
   dropoffNote: "Arrive no earlier than 3:45 PM",
   pickupNote: "Pick up by 5:15 PM",
@@ -49,23 +52,26 @@ export const SEED_CONFIG = {
     d("2027-05-19", "Wednesday", "All 6 schools • LAST REHEARSAL"),
   ],
   importantDates: [
-    { date: "2026-10-06", title: "First rehearsal", detail: "Glenn Westlake Middle School, 4:00–5:00 PM" },
+    { date: "2026-10-06", title: "First rehearsal", detail: "At Glenn Westlake Middle School, 4:00–5:00 PM" },
     { date: "2026-12-16", title: "Combined rehearsals begin", detail: "Wednesdays with all 6 schools through Jan 13" },
+    { date: "2027-01-20", title: "Winter Concert", detail: "7:00 PM • Glenbard East High School" },
     { date: "2027-01-26", title: "Tuesday rehearsals resume", detail: "Regular Tuesday schedule" },
+    { date: "2027-04-10", title: "Pancake Day", detail: "7:30 AM–12:00 PM • GWMS Cafeteria" },
     { date: "2027-04-14", title: "Early release day", detail: "Elementary dismissal 1:15 PM • Rehearsal still at 4:00 PM" },
+    { date: "2027-05-10", title: "Spring Concert", detail: "7:00 PM • Glenbard East High School" },
     { date: "2027-05-19", title: "Last rehearsal", detail: "All 6 schools" },
   ],
 };
 
 // Ride needs: "both" | "dropoff" | "pickup" | "none"
-export const SEED_NEEDS = {
+export const SEED_NEEDS: Record<string, KidNeeds> = {
   james: { usual: { Tuesday: "both", Wednesday: "dropoff" }, overrides: {} },
   will: { usual: { Tuesday: "both", Wednesday: "pickup" }, overrides: {} },
   victoria: { usual: { Tuesday: "both", Wednesday: "both" }, overrides: { "2026-10-13": "none" } },
 };
 
 // Driver signups already in the sheet.
-export const SEED_RIDES = {
+export const SEED_RIDES: Record<string, Ride> = {
   "2026-10-06": { dropoff: [{ email: "jill@snacksdesign.com", name: "Jill", seats: 4, kids: ["james"] }], pickup: [] },
   "2026-10-13": { dropoff: [{ email: "jill@snacksdesign.com", name: "Jill", seats: 4, kids: ["james", "will"] }], pickup: [] },
 };

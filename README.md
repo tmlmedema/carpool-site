@@ -1,71 +1,60 @@
-# 4th Grade Band Carpool — Parent Portal
+# 4th Grade Band Carpool (Next.js)
 
-A small website for the carpool: parents sign in with a one-time email link, set their child's ride needs, and sign up to drive. Built with Next.js and hosted on Vercel, with data in Upstash Redis.
+Parent portal for the Park View Elementary 4th Grade Band carpool. Parents sign in with a one-time email link, set their child's ride needs, and sign up to drive to rehearsals at Glenn Westlake Middle School.
 
-## What's inside
+Built with **Next.js (App Router) + TypeScript + React**. Hosted on **Vercel**, with data in **Upstash Redis** (free tier) and sign-in emails through **Resend**.
 
-- `app/`: Next.js App Router pages (`/`, `/schedule`, `/my-child`, `/dates`, `/admin`) and global styles
-- `app/api/[...path]/route.ts`: serves every `/api/*` request through the router in `lib/api.js`
-- `components/`: the page shell, login, rehearsal cards, profile dialog, and `PortalProvider` (shared signed-in state, toasts)
-- `lib/`: server logic (`api.js`, `auth.js`, `store.js`) and `seed.js`, the starting data copied from the Google Sheet
-- `test/api.test.js`: API smoke test against a running dev server
-
-## Local development
+## Project layout
 
 ```
+app/
+  layout.tsx            root layout: fonts, header/footer shell, sign-in gate
+  page.tsx              Home (next rehearsal, this week, upcoming)
+  schedule/page.tsx     Carpool Schedule (filters, drive sign-up, ?d=<date> jump, ?f=mine)
+  my-child/page.tsx     My Child's Rides (usual rides, weekly changes, home address)
+  dates/page.tsx        Important Dates
+  admin/page.tsx        Admin (families + emails, admins, dates, site text, CSV export)
+  api/[...path]/route.ts  every /api/* request → lib/server/api.ts
+  globals.css           all styles (Park View black & yellow)
+components/             Shell (header, account menu, phone menu, footer), Login, Rehearsal cards, forms
+lib/
+  types.ts              shared types
+  client/               browser helpers: portal context (state, toasts, dialogs), date formatting
+  server/               api.ts (routes + permissions), auth.ts (signed tokens), store.ts (Redis / local files), seed.ts (starting data from the Google Sheet)
+test/api.test.mjs       API permission checks
+```
+
+## Run locally
+
+```bash
 npm install
-ADMIN_EMAILS=you@example.com npm run dev    # http://localhost:3000
+ADMIN_EMAILS=you@example.com npm run dev     # http://localhost:8888
+npm test                                     # in a second terminal
 ```
 
-`.env.development` sets local defaults: data goes to JSON files in `./.localdata`, and the sign-in link shows on the page instead of being emailed. Delete `.localdata/` to start over from the seed data.
+Locally there's no email: after you enter your email, an **open sign-in link** appears on the page. Data is saved to `./.localdata` (git-ignored). Mac users can also double-click **Start Carpool Site.command**.
 
-To run the API checks, start from an empty data folder with the test admin:
+## Deploy on Vercel
 
-```
-rm -rf .localdata && ADMIN_EMAILS=jill@snacksdesign.com npm run dev
-npm test          # in a second terminal (set BASE=http://localhost:PORT if not 3000)
-```
-
-## Database (Turso)
-
-The app is moving from the key-value store in `lib/store.js` to Turso (libSQL) with Drizzle. The schema is in place; the pages don't read from it yet.
-
-- `lib/db/schema.ts`: tables and constraints. The database itself enforces the ride rules: one car per kid per leg, seat limits (triggers in `drizzle/0001_seat_limit_triggers.sql`), and guardians must be carpool members.
-- `drizzle/`: migrations. After changing the schema, run `npm run db:generate` and commit the new files.
-- `lib/db/seed-carpool.ts`: loads the Google Sheet data from `lib/seed.js`.
-
-Locally, `.env.development` points at a SQLite file (`local.db`):
-
-```
-npm run db:migrate                                  # create/update the tables
-ADMIN_EMAILS=you@example.com npm run db:seed        # load the seed data (add -- --reset to start over)
-npm run db:studio                                   # browse the data
-npm run test:db                                     # schema and constraint tests
-```
-
-For the real database, put `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` in `.env.production.local` and run the same commands with `NODE_ENV=production` in front.
-
-## Deploy to Vercel
-
-1. **Import the GitHub repo** in Vercel. It detects Next.js automatically, so no build settings are needed.
-2. **Add storage:** in the project, open Storage → Marketplace → **Upstash Redis** and connect it. This injects `KV_REST_API_URL` / `KV_REST_API_TOKEN`.
-3. **Set up email sending (Resend, free tier):** sign up at resend.com, verify your domain and create an API key. Without a verified domain, Resend only sends to your own account email.
-4. **Add environment variables** (Settings → Environment Variables; see `.env.example`):
+1. **Import the repo** in Vercel (Add New → Project). It detects Next.js automatically.
+2. **Add storage:** Storage (or Marketplace) → **Upstash for Redis** → create a free database → connect it to this project. That sets `KV_REST_API_URL` and `KV_REST_API_TOKEN`.
+3. **Environment variables** (see `.env.example`):
 
    | Name | Value |
    |---|---|
-   | `SESSION_SECRET` | 40+ random characters (`openssl rand -hex 32`) |
-   | `RESEND_API_KEY` | your Resend key |
-   | `FROM_EMAIL` | `Band Carpool <carpool@yourdomain.com>` (must be on your verified domain) |
-   | `ADMIN_EMAILS` | always-admin emails, comma separated |
-   | `SITE_URL` | optional, your custom domain, e.g. `https://carpool.example.com` |
+   | `SESSION_SECRET` | 32+ random characters (`openssl rand -hex 32`) |
+   | `ADMIN_EMAILS` | `jill@snacksdesign.com` (comma separated) |
+   | `RESEND_API_KEY` | from resend.com, after verifying your sending domain |
+   | `FROM_EMAIL` | `Band Carpool <carpool@yourdomain.com>` (on the verified domain) |
+   | `SITE_URL` | optional, custom domain, e.g. `https://carpool.snacksdesign.com` |
 
-5. **Redeploy**, then sign in with your admin email.
-6. **Admin page → Kids & parent emails:** add each family's email(s) and save. Only emails listed there (plus admins) can sign in.
+4. **Redeploy**, sign in with an admin email, then **Admin → Kids & parent emails**: add each family's email(s) and save. Only listed emails (plus admins) can sign in.
 
 ## How it works
 
-- **Login:** the parent enters their email. If it's on the list, they get a link that works once and expires in 20 minutes. After that they stay signed in for 60 days on that device.
-- **Permissions:** parents change only their own child's rides. Any parent can sign up to drive and add kids who still need a ride. Parents can only remove themselves from a car. Admins can edit everything.
-- **"Still needs a ride"** is worked out automatically: children whose ride needs include that leg, minus children already in someone's car.
+- **Sign-in:** one-time link, valid 20 minutes, rate-limited to 5 per email per hour. Sessions last 60 days in an HttpOnly cookie signed with `SESSION_SECRET`. The form gives the same answer whether or not an email is on the list.
+- **Permissions (enforced in `lib/server/api.ts`):** parents change only their own child's rides and address. Any parent can **I can drive** and add kids who still need a ride to their car, and can change or remove only their own car. Admins can edit everything, including **+ Add another driver** for someone who offered by text.
+- **Addresses:** visible only to the child's parents, admins, and drivers who have that child in their car (**Addresses & contacts** on the car, with Google Maps links).
+- **"Still needs a ride"** = children whose ride needs include that leg, minus children already in a car. **Driver needed** shows when those kids outnumber open seats.
+- **Starting data** (`lib/server/seed.ts`) loads once on first run: rehearsal dates, important dates, and the three kids from the sheet. After that, edit everything in Admin.
 - **Backup:** Admin → Download schedule (CSV).

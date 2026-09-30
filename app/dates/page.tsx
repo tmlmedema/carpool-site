@@ -1,8 +1,7 @@
 "use client";
-
-import { useSignedIn } from "@/components/PortalProvider";
-import { DateBadge } from "@/components/RehearsalCard";
-import { fmt, isPast } from "@/lib/dates";
+import { useSignedIn } from "@/lib/client/portal";
+import { fmt, isPast } from "@/lib/client/format";
+import { DateBadge } from "@/components/Rehearsal";
 
 export default function DatesPage() {
   const { S } = useSignedIn();
