@@ -11,7 +11,7 @@ const FILTERS: [Filter, string][] = [["all", "All"], ["needs", "Needs drivers"],
 const EMPTY: Record<Filter, string> = {
   all: "No rehearsals to show.",
   needs: "Every upcoming rehearsal has enough drivers.",
-  mine: "You aren't driving and your child isn't riding in any of these rehearsals.",
+  mine: "You haven't signed up to drive for any upcoming rehearsals yet. Tap I can drive on a rehearsal to volunteer.",
 };
 
 export default function SchedulePage() {
@@ -41,10 +41,8 @@ function Schedule({ jumpTo, initialFilter }: { jumpTo: string | null; initialFil
     return () => { cancelAnimationFrame(raf); clearTimeout(t); };
   }, [jumpTo]);
 
-  const mineKids = S.me.kids;
-  const isMine = (d: Rehearsal) => LEGS.some((l) =>
-    d[l].drivers.some((x) => x.email === S.me.email || x.addedBy === S.me.email || x.kids.some((k) => mineKids.includes(k)))
-    || d[l].needing.some((k) => mineKids.includes(k)));
+  // Rehearsals where you signed up to drive (either leg).
+  const isMine = (d: Rehearsal) => LEGS.some((l) => d[l].drivers.some((x) => x.email === S.me.email));
 
   let list = S.schedule.filter((d) => !isPast(d.id));
   if (filter === "needs") list = list.filter(needsDriver);
@@ -55,7 +53,7 @@ function Schedule({ jumpTo, initialFilter }: { jumpTo: string | null; initialFil
       <div className="page-head">
         <div>
           <h2>Carpool Schedule</h2>
-          <p className="muted" style={{ margin: 0 }}>Offer seats with <b>I can drive</b>, then tap a red name to add that child to a car.</p>
+          <p className="muted" style={{ margin: 0 }}>Offer seats with <b>I can drive</b>, then tap a blue name to add that child to a car.</p>
         </div>
         <div className="filters">
           <div className="seg filter-seg" role="tablist" aria-label="Filter rehearsals">
