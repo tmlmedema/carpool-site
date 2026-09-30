@@ -23,6 +23,9 @@ assert.deepEqual(st.schedule[10].dropoff.stillNeed, ["james", "victoria"]); // W
 assert.deepEqual(st.schedule[10].pickup.stillNeed, ["will", "victoria"]);
 
 assert.equal(await login("pat@example.com"), null, "unknown parent gets no link");
+const denied = await fetch(B + "/api/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: "pat@example.com" }) });
+assert.equal(denied.status, 403, "unknown email is refused");
+assert.match((await denied.json()).error, /isn't on the parent list/);
 const kids = st.config.kids.map((k) => ({ ...k, parents: k.id === "will" ? ["pat@example.com"] : k.parents }));
 assert.equal((await call(admin, "/admin/config", { kids })).status, 200);
 const pat = await login("pat@example.com");
