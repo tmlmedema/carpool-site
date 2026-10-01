@@ -15,7 +15,7 @@ export default function MyChildPage() {
     return <div className="wrap page"><h2>My Child&apos;s Rides</h2><div className="card">Your email isn&apos;t linked to a child yet. Ask the coordinator to add you.</div></div>;
   }
 
-  const kidName = (id: string) => S.config.kids.find((k) => k.id === id)?.name || id;
+  const kidName = (id: number) => S.config.kids.find((k) => k.id === id)?.name || id;
   const n = S.needs[sel] || { usual: {}, overrides: {} };
   const weekdays = [...new Set(S.schedule.map((d) => d.weekday))];
 
@@ -34,7 +34,7 @@ export default function MyChildPage() {
           <p className="muted" style={{ margin: 0 }}>Set the usual rides once and every week fills in. Change any single week below.</p>
         </div>
         {kids.length > 1 && (
-          <select aria-label="Child" style={{ width: "auto" }} value={sel} onChange={(e) => setPicked(e.target.value)}>
+          <select aria-label="Child" style={{ width: "auto" }} value={sel} onChange={(e) => setPicked(Number(e.target.value))}>
             {kids.map((k) => <option key={k} value={k}>{kidName(k)}</option>)}
           </select>
         )}
@@ -92,7 +92,7 @@ export default function MyChildPage() {
   );
 }
 
-function AddressForm({ kidId }: { kidId: string }) {
+function AddressForm({ kidId }: { kidId: number }) {
   const { S, act } = useSignedIn();
   const [addr, setAddr] = useState(S.kidInfo[kidId]?.address || "");
   const [notes, setNotes] = useState(S.kidInfo[kidId]?.notes || "");

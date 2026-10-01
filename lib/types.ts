@@ -6,7 +6,7 @@ export const LEGS: Leg[] = ["dropoff", "pickup"];
 export const NEED_VALUES: Need[] = ["both", "dropoff", "pickup", "none"];
 
 export interface Kid {
-  id: string;
+  id: number;
   name: string;
   parents?: string[]; // only sent to admins
 }
@@ -46,7 +46,7 @@ export interface Driver {
   email: string; // "guest:..." for drivers an admin added
   name: string;
   seats: number;
-  kids: string[];
+  kids: number[]; // kid ids
   phone?: string;
   addedBy?: string;
 }
@@ -58,8 +58,8 @@ export interface Ride {
 
 export interface LegState {
   drivers: Driver[];
-  needing: string[];
-  stillNeed: string[];
+  needing: number[];
+  stillNeed: number[];
 }
 
 export interface Rehearsal extends RehearsalDate {
@@ -74,10 +74,10 @@ export interface KidInfo {
 }
 
 export interface PortalState {
-  me: { email: string; name: string; phone: string; isAdmin: boolean; kids: string[] };
-  kidInfo: Record<string, KidInfo>;
-  config: Omit<Config, "dates" | "admins"> & { admins?: string[]; envAdmins?: string[] };
-  needs: Record<string, KidNeeds>;
+  me: { email: string; name: string; phone: string; isAdmin: boolean; kids: number[] };
+  kidInfo: Record<number, KidInfo>;
+  config: Omit<Config, "dates" | "admins"> & { admins?: string[] };
+  needs: Record<number, KidNeeds>;
   schedule: Rehearsal[];
   people: Record<string, { name: string; phone: string }>;
 }

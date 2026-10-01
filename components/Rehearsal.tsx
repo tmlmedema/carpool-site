@@ -70,7 +70,7 @@ function LegBlock({ d, leg, past }: { d: Rehearsal; leg: Leg; past: boolean }) {
   const { S, act, confirm, showDialog } = useSignedIn();
   const [offerSeats, setOfferSeats] = useState(4);
   const L = d[leg];
-  const kidName = (id: string) => S.config.kids.find((k) => k.id === id)?.name || id;
+  const kidName = (id: number) => S.config.kids.find((k) => k.id === id)?.name || id;
   const me = L.drivers.find((x) => x.email === S.me.email);
   const manages = (x: Driver) => x.email === S.me.email || x.addedBy === S.me.email || S.me.isAdmin;
   // Tapping a name puts the child in your car, or else in a car you manage, if it has room.
@@ -191,7 +191,7 @@ function AddDriverForm({ date, leg, close }: { date: string; leg: Leg; close: ()
 
 function AddressesDialog({ d, leg, car, close }: { d: Rehearsal; leg: Leg; car: Driver; close: () => void }) {
   const { S } = useSignedIn();
-  const kidName = (id: string) => S.config.kids.find((k) => k.id === id)?.name || id;
+  const kidName = (id: number) => S.config.kids.find((k) => k.id === id)?.name || id;
   const addrs = car.kids.map((k) => S.kidInfo[k]?.address).filter((a): a is string => !!a);
   const route = routeLink(addrs);
   return (

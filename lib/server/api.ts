@@ -1,10 +1,10 @@
 // All server logic for /api/*. app/api/[...path]/route.ts passes every request here.
 import "server-only";
-import { store, type Store } from "./store";
+import type { Client, InStatement, Row } from "@libsql/client";
+import { db, isConstraintError } from "./db";
 import {
   makeLinkToken, readLinkToken, makeSessionCookie, clearSessionCookie, sessionEmail, normEmail,
 } from "./auth";
-import { SEED_CONFIG, SEED_NEEDS, SEED_RIDES } from "./seed";
 import {
   LEGS, NEED_VALUES as NEEDS,
   type Config, type Driver, type KidInfo, type KidNeeds, type Leg, type LegState, type Need, type Rehearsal, type RehearsalDate, type Ride,
@@ -12,7 +12,10 @@ import {
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Body = Record<string, any>;
-interface Profile { name?: string; phone?: string }
+interface Profile { name: string; phone: string }
+// A driver as stored: the cars row id is kept for updates but never sent to the browser.
+type Car = Driver & { id: number };
+type CarRide = Record<Leg, Car[]>;
 
 // Show the sign-in link on the page instead of emailing it (local development only).
 const showDevLink = () => process.env.DEV_SHOW_LINK === "true" || (process.env.NODE_ENV !== "production" && !process.env.RESEND_API_KEY);
@@ -22,27 +25,87 @@ const json = (data: unknown, status = 200, headers: Record<string, string> = {})
   new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json", "cache-control": "no-store", ...headers } });
 const fail = (status: number, error: string) => json({ error }, status);
 const clean = (s: unknown, max = 200) => String(s ?? "").replace(/[\u0000-\u001f]/g, " ").trim().slice(0, max);
-const envAdmins = () => (process.env.ADMIN_EMAILS || "").split(",").map(normEmail).filter(Boolean);
+const str = (v: unknown) => (v == null ? "" : String(v));
+const weekdayOf = (date: string) => new Date(date + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "long", timeZone: "UTC" });
 
-async function getConfig(s: Store): Promise<Config> {
-  let cfg = await s.get<Config>("config");
-  if (!cfg) {
-    // First run: load starting data from the sheet.
-    cfg = structuredClone(SEED_CONFIG);
-    await s.set("config", cfg);
-    for (const [kid, n] of Object.entries(SEED_NEEDS)) await s.set(`needs/${kid}`, n);
-    for (const [date, r] of Object.entries(SEED_RIDES)) await s.set(`rides/${date}`, r);
-  }
-  // Older copies stored the rehearsal site as the school. Split them.
-  if (cfg.location === undefined) {
-    cfg.location = SEED_CONFIG.location;
-    if (cfg.school === SEED_CONFIG.location) cfg.school = SEED_CONFIG.school;
-    await s.set("config", cfg);
-  }
-  return cfg;
+// ---------- reading ----------
+// The site config plus each rehearsal date's row id (the API identifies rehearsals by their date).
+type Cfg = Config & { rehearsalId: Record<string, number> };
+
+async function loadConfig(c: Client): Promise<Cfg> {
+  const [settings, kids, parents, admins, dates, important] = await c.batch([
+    "SELECT * FROM settings ORDER BY id LIMIT 1",
+    "SELECT id, name FROM kids ORDER BY position, id",
+    "SELECT kp.kid_id, u.email FROM kid_parents kp JOIN users u ON u.id = kp.user_id ORDER BY kp.position, kp.id",
+    "SELECT email FROM users WHERE is_admin = 1 ORDER BY email",
+    "SELECT id, date, note, flag FROM rehearsal_dates ORDER BY date",
+    "SELECT date, title, detail FROM important_dates ORDER BY date, id",
+  ], "read");
+  const st = settings.rows[0];
+  return {
+    title: str(st.title), school: str(st.school), location: str(st.location), rehearsal: str(st.rehearsal),
+    dropoffNote: str(st.dropoff_note), pickupNote: str(st.pickup_note),
+    kids: kids.rows.map((k) => ({ id: Number(k.id), name: str(k.name), parents: parents.rows.filter((p) => p.kid_id === k.id).map((p) => str(p.email)) })),
+    admins: admins.rows.map((a) => str(a.email)),
+    dates: dates.rows.map((d) => ({ id: str(d.date), weekday: weekdayOf(str(d.date)), note: str(d.note), flag: str(d.flag) as RehearsalDate["flag"] })),
+    importantDates: important.rows.map((d) => ({ date: str(d.date), title: str(d.title), detail: str(d.detail) })),
+    rehearsalId: Object.fromEntries(dates.rows.map((d) => [str(d.date), Number(d.id)])),
+  };
 }
 
-const isAdmin = (cfg: Config, email: string) => [...envAdmins(), ...(cfg.admins || []).map(normEmail)].includes(email);
+async function loadNeeds(c: Client, cfg: Config, kidId?: number): Promise<Record<number, KidNeeds>> {
+  const [usual, overrides] = await c.batch([
+    { sql: "SELECT kid_id, weekday, need FROM kid_usual_needs" + (kidId ? " WHERE kid_id = ?" : ""), args: kidId ? [kidId] : [] },
+    {
+      sql: "SELECT o.kid_id, r.date, o.need FROM kid_need_overrides o JOIN rehearsal_dates r ON r.id = o.rehearsal_id" + (kidId ? " WHERE o.kid_id = ?" : ""),
+      args: kidId ? [kidId] : [],
+    },
+  ], "read");
+  const needs: Record<number, KidNeeds> = {};
+  for (const k of cfg.kids) if (!kidId || k.id === kidId) needs[k.id] = { usual: {}, overrides: {} };
+  for (const r of usual.rows) { const n = needs[Number(r.kid_id)]; if (n) n.usual[str(r.weekday)] = str(r.need) as Need; }
+  for (const r of overrides.rows) { const n = needs[Number(r.kid_id)]; if (n) n.overrides[str(r.date)] = str(r.need) as Need; }
+  return needs;
+}
+
+const emptyRide = (): CarRide => ({ dropoff: [], pickup: [] });
+
+function toCar(r: Row, kids: number[]): Car {
+  const id = Number(r.id);
+  const addedBy = r.added_by ? { addedBy: str(r.added_by) } : {};
+  if (r.driver_id == null) return { id, email: `guest:${id}`, name: str(r.guest_name), phone: str(r.guest_phone), seats: Number(r.seats), kids, ...addedBy };
+  return { id, email: str(r.driver_email), name: str(r.driver_name) || str(r.driver_email), seats: Number(r.seats), kids, ...addedBy };
+}
+
+// Cars for every rehearsal date (or just one), keyed by date.
+async function loadRides(c: Client, cfg: Config, date?: string): Promise<Record<string, CarRide>> {
+  const where = date ? " WHERE r.date = ?" : "";
+  const args = date ? [date] : [];
+  const [cars, riders] = await c.batch([
+    {
+      sql: `SELECT c.*, r.date, u.email AS driver_email, u.name AS driver_name, a.email AS added_by
+        FROM cars c JOIN rehearsal_dates r ON r.id = c.rehearsal_id
+        LEFT JOIN users u ON u.id = c.driver_id LEFT JOIN users a ON a.id = c.added_by_id${where} ORDER BY c.id`,
+      args,
+    },
+    { sql: `SELECT ck.car_id, ck.kid_id FROM car_kids ck JOIN rehearsal_dates r ON r.id = ck.rehearsal_id${where} ORDER BY ck.id`, args },
+  ], "read");
+  const rides: Record<string, CarRide> = {};
+  for (const d of cfg.dates) if (!date || d.id === date) rides[d.id] = emptyRide();
+  for (const r of cars.rows) {
+    const ride = rides[str(r.date)];
+    if (ride) ride[str(r.leg) as Leg].push(toCar(r, riders.rows.filter((k) => k.car_id === r.id).map((k) => Number(k.kid_id))));
+  }
+  return rides;
+}
+
+async function loadUsers(c: Client): Promise<Record<string, Profile>> {
+  const { rows } = await c.execute("SELECT email, name, phone FROM users");
+  return Object.fromEntries(rows.map((u) => [str(u.email), { name: str(u.name), phone: str(u.phone) }]));
+}
+
+// Admins are the users marked is_admin (ADMIN_EMAILS only sets up the first ones; see db.ts).
+const isAdmin = (cfg: Config, email: string) => (cfg.admins || []).map(normEmail).includes(email);
 const kidsOf = (cfg: Config, email: string) => cfg.kids.filter((k) => (k.parents || []).map(normEmail).includes(email)).map((k) => k.id);
 const isAllowed = (cfg: Config, email: string) => isAdmin(cfg, email) || kidsOf(cfg, email).length > 0;
 
@@ -51,24 +114,16 @@ function resolveNeed(needs: KidNeeds | undefined, date: RehearsalDate): Need {
   return needs.overrides?.[date.id] || needs.usual?.[date.weekday] || "none";
 }
 const needsLeg = (need: Need, leg: Leg) => need === "both" || need === leg;
-const emptyRide = (): Ride => ({ dropoff: [], pickup: [] });
 
-async function loadAll(s: Store, cfg: Config) {
-  const needs: Record<string, KidNeeds> = {};
-  await Promise.all(cfg.kids.map(async (k) => { needs[k.id] = (await s.get<KidNeeds>(`needs/${k.id}`)) || { usual: {}, overrides: {} }; }));
-  const rides: Record<string, Ride> = {};
-  await Promise.all(cfg.dates.map(async (d) => { rides[d.id] = (await s.get<Ride>(`rides/${d.id}`)) || emptyRide(); }));
-  return { needs, rides };
-}
-
-function buildSchedule(cfg: Config, needs: Record<string, KidNeeds>, rides: Record<string, Ride>): Rehearsal[] {
+function buildSchedule(cfg: Config, needs: Record<number, KidNeeds>, rides: Record<string, Ride | CarRide>): Rehearsal[] {
   return cfg.dates.map((d) => {
     const r = rides[d.id] || emptyRide();
     const legs = {} as Record<Leg, LegState>;
     for (const leg of LEGS) {
       const assigned = new Set(r[leg].flatMap((dr) => dr.kids));
       const needing = cfg.kids.filter((k) => needsLeg(resolveNeed(needs[k.id], d), leg)).map((k) => k.id);
-      legs[leg] = { drivers: r[leg], needing, stillNeed: needing.filter((k) => !assigned.has(k)) };
+      const drivers = r[leg].map((dr: Driver & { id?: number }) => { const out = { ...dr }; delete out.id; return out; });
+      legs[leg] = { drivers, needing, stillNeed: needing.filter((k) => !assigned.has(k)) };
     }
     return { ...d, ...legs };
   });
@@ -100,8 +155,8 @@ export async function handle(req: Request): Promise<Response> {
   const url = new URL(req.url);
   const route = url.pathname.replace(/^\/api/, "") || "/";
   const method = req.method;
-  const s = await store();
-  const cfg = await getConfig(s);
+  const c = await db();
+  const cfg = await loadConfig(c);
   const body: Body = method === "POST" ? await req.json().catch(() => ({})) : {};
 
   // ----- public routes -----
@@ -121,10 +176,9 @@ export async function handle(req: Request): Promise<Response> {
     const p = readLinkToken(url.searchParams.get("t"));
     const redirect = (to: string, cookie?: string) => new Response(null, { status: 302, headers: { location: to, ...(cookie ? { "set-cookie": cookie } : {}) } });
     if (!p) return redirect("/?login=expired");
-    const usedKey = `usedlinks/${p.n}`;
-    if (await s.get(usedKey)) return redirect("/?login=used");
     if (!isAllowed(cfg, p.e)) return redirect("/?login=denied");
-    await s.set(usedKey, { at: Date.now() });
+    const used = await c.execute({ sql: "INSERT INTO used_links (token, used_at) VALUES (?, ?) ON CONFLICT DO NOTHING", args: [String(p.n), Date.now()] });
+    if (!used.rowsAffected) return redirect("/?login=used");
     return redirect("/", makeSessionCookie(p.e));
   }
 
@@ -135,159 +189,173 @@ export async function handle(req: Request): Promise<Response> {
   if (!email || !isAllowed(cfg, email)) return fail(401, "Please sign in.");
   const admin = isAdmin(cfg, email);
   const mine = kidsOf(cfg, email);
-  const profile = (await s.get<Profile>(`users/${email}`)) || {};
+  const me = (await c.execute({ sql: "SELECT name, phone FROM users WHERE email = ?", args: [email] })).rows[0];
+  const profile: Profile = { name: str(me?.name), phone: str(me?.phone) };
 
   if (route === "/state" && method === "GET") {
-    const { needs, rides } = await loadAll(s, cfg);
+    const [needs, rides, users, info] = await Promise.all([
+      loadNeeds(c, cfg), loadRides(c, cfg), loadUsers(c), c.execute("SELECT id, address, notes FROM kids"),
+    ]);
+    const user = (e: string) => users[normEmail(e)] || { name: "", phone: "" };
     const people: Record<string, { name: string; phone: string }> = {};
-    const emails = new Set(Object.values(rides).flatMap((r) => LEGS.flatMap((l) => r[l].map((d) => d.email))));
-    await Promise.all([...emails].map(async (e) => { const u = (await s.get<Profile>(`users/${e}`)) || {}; people[e] = { name: u.name || "", phone: u.phone || "" }; }));
+    for (const r of Object.values(rides)) for (const l of LEGS) for (const d of r[l]) if (!d.email.startsWith("guest:")) people[d.email] = user(d.email);
     // Home addresses: shown to the child's parents, admins, and anyone driving (or who added) a car that child rides in.
     const canSee = new Set(admin ? cfg.kids.map((k) => k.id) : mine);
     for (const r of Object.values(rides)) for (const l of LEGS) for (const d of r[l])
       if (d.email === email || d.addedBy === email) d.kids.forEach((k) => canSee.add(k));
-    const kidInfo: Record<string, KidInfo> = {};
-    await Promise.all([...canSee].map(async (id) => {
+    const kidInfo: Record<number, KidInfo> = {};
+    for (const id of canSee) {
       const kid = cfg.kids.find((k) => k.id === id);
-      if (!kid) return;
-      const info = (await s.get<{ address?: string; notes?: string }>(`kidinfo/${id}`)) || {};
-      const parents = await Promise.all((kid.parents || []).map(async (e) => { const u = (await s.get<Profile>(`users/${normEmail(e)}`)) || {}; return { name: u.name || "", phone: u.phone || "", email: normEmail(e) }; }));
-      kidInfo[id] = { address: info.address || "", notes: info.notes || "", parents };
-    }));
+      if (!kid) continue;
+      const row = info.rows.find((r) => Number(r.id) === id);
+      kidInfo[id] = { address: str(row?.address), notes: str(row?.notes), parents: (kid.parents || []).map((e) => ({ ...user(e), email: normEmail(e) })) };
+    }
     return json({
-      me: { email, name: profile.name || "", phone: profile.phone || "", isAdmin: admin, kids: mine },
+      me: { email, name: profile.name, phone: profile.phone, isAdmin: admin, kids: mine },
       kidInfo,
       config: {
         title: cfg.title, school: cfg.school, location: cfg.location, rehearsal: cfg.rehearsal, dropoffNote: cfg.dropoffNote, pickupNote: cfg.pickupNote,
         kids: cfg.kids.map((k) => (admin ? k : { id: k.id, name: k.name })),
         admins: admin ? cfg.admins : undefined,
-        envAdmins: admin ? envAdmins() : undefined,
         importantDates: cfg.importantDates,
       },
-      needs: Object.fromEntries(Object.entries(needs).filter(([k]) => admin || mine.includes(k))),
+      needs: Object.fromEntries(Object.entries(needs).filter(([k]) => admin || mine.includes(Number(k)))),
       schedule: buildSchedule(cfg, needs, rides),
       people,
     });
   }
 
   if (route === "/kidinfo" && method === "POST") {
-    const kid = cfg.kids.find((k) => k.id === body.kidId);
+    const kid = cfg.kids.find((k) => k.id === Number(body.kidId));
     if (!kid) return fail(404, "Child not found.");
     if (!admin && !mine.includes(kid.id)) return fail(403, "You can only change your own child's address.");
-    await s.set(`kidinfo/${kid.id}`, { address: clean(body.address, 200), notes: clean(body.notes, 200) });
+    await c.execute({ sql: "UPDATE kids SET address = ?, notes = ? WHERE id = ?", args: [clean(body.address, 200), clean(body.notes, 200), kid.id] });
     return json({ ok: true });
   }
 
   if (route === "/profile" && method === "POST") {
     const next = { name: clean(body.name, 60), phone: clean(body.phone, 30) };
     if (!next.name) return fail(400, "Please enter your name.");
-    await s.set(`users/${email}`, next);
-    // keep driver names on existing signups current
-    for (const d of cfg.dates) {
-      const r = await s.get<Ride>(`rides/${d.id}`);
-      if (!r) continue;
-      let changed = false;
-      for (const leg of LEGS) for (const dr of r[leg]) if (dr.email === email && dr.name !== next.name) { dr.name = next.name; changed = true; }
-      if (changed) await s.set(`rides/${d.id}`, r);
-    }
+    // Driver names come from here, so signups show the new name without being rewritten.
+    await c.execute({
+      sql: "INSERT INTO users (email, name, phone) VALUES (?, ?, ?) ON CONFLICT (email) DO UPDATE SET name = excluded.name, phone = excluded.phone",
+      args: [email, next.name, next.phone],
+    });
     return json({ ok: true });
   }
 
   if (route === "/needs" && method === "POST") {
-    const kid = cfg.kids.find((k) => k.id === body.kidId);
+    const kid = cfg.kids.find((k) => k.id === Number(body.kidId));
     if (!kid) return fail(404, "Child not found.");
     if (!admin && !mine.includes(kid.id)) return fail(403, "You can only change rides for your own child.");
-    const n = (await s.get<KidNeeds>(`needs/${kid.id}`)) || { usual: {}, overrides: {} };
+    const writes: InStatement[] = [];
     if (body.usual) for (const [day, v] of Object.entries(body.usual as Record<string, Need>)) {
       if (!cfg.dates.some((d) => d.weekday === day) || !NEEDS.includes(v)) return fail(400, "Invalid value.");
-      n.usual[day] = v;
+      writes.push({ sql: "INSERT INTO kid_usual_needs (kid_id, weekday, need) VALUES (?, ?, ?) ON CONFLICT (kid_id, weekday) DO UPDATE SET need = excluded.need", args: [kid.id, day, v] });
     }
     if (body.overrides) for (const [date, v] of Object.entries(body.overrides as Record<string, Need | null | "">)) {
       if (!cfg.dates.some((d) => d.id === date)) return fail(400, "Unknown date.");
-      if (v === null || v === "") delete n.overrides[date];
-      else if (NEEDS.includes(v)) n.overrides[date] = v;
+      const rehearsal = cfg.rehearsalId[date];
+      if (v === null || v === "") writes.push({ sql: "DELETE FROM kid_need_overrides WHERE kid_id = ? AND rehearsal_id = ?", args: [kid.id, rehearsal] });
+      else if (NEEDS.includes(v)) writes.push({ sql: "INSERT INTO kid_need_overrides (kid_id, rehearsal_id, need) VALUES (?, ?, ?) ON CONFLICT (kid_id, rehearsal_id) DO UPDATE SET need = excluded.need", args: [kid.id, rehearsal, v] });
       else return fail(400, "Invalid value.");
     }
-    await s.set(`needs/${kid.id}`, n);
-    return json({ ok: true, needs: n });
+    if (writes.length) await c.batch(writes, "write");
+    return json({ ok: true, needs: (await loadNeeds(c, cfg, kid.id))[kid.id] });
   }
 
   if (route.startsWith("/rides/") && method === "POST") {
     const date = cfg.dates.find((d) => d.id === body.date);
     const leg = body.leg as Leg;
     if (!date || !LEGS.includes(leg)) return fail(400, "Invalid rehearsal or leg.");
-    const r = (await s.get<Ride>(`rides/${date.id}`)) || emptyRide();
+    const cars = (await loadRides(c, cfg, date.id))[date.id][leg];
+    const rehearsal = cfg.rehearsalId[date.id];
     const action = route.slice("/rides/".length);
 
     // Who may change a car: its driver, the parent who added it, or an admin.
-    const canManage = (drv: Driver) => drv.email === email || drv.addedBy === email || admin;
+    const canManage = (drv: Car) => drv.email === email || drv.addedBy === email || admin;
     const seatsOf = (v: unknown) => Math.max(1, Math.min(10, parseInt(String(v), 10) || 0));
 
-    if (action === "drive") {
-      const seats = seatsOf(body.seats);
-      const target = normEmail(body.driver || email);
-      const existing = r[leg].find((d) => d.email === target);
-      if (existing) {
-        if (!canManage(existing)) return fail(403, "You can only change your own car.");
-        if (existing.kids.length > seats) return fail(400, `That car already has ${existing.kids.length} kids. Remove some before lowering seats.`);
-        existing.seats = seats;
-      } else {
-        if (target !== email) return fail(404, "Driver not found.");
-        if (!profile.name) return fail(400, "Add your name first (your initials, top right → My info).");
-        r[leg].push({ email, name: profile.name, seats, kids: [] });
-      }
-    } else if (action === "add-driver") {
-      if (!admin) return fail(403, "Only admins can add a driver for someone else. Use I can drive to sign yourself up.");
-      // Add another parent as a driver (e.g. someone who offered by text).
-      const name = clean(body.name, 60);
-      if (!name) return fail(400, "Enter the driver's name.");
-      r[leg].push({ email: `guest:${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, name, phone: clean(body.phone, 30), seats: seatsOf(body.seats), kids: [], addedBy: email });
-    } else if (action === "withdraw") {
-      const target = normEmail(body.email || email);
-      const drv = r[leg].find((d) => d.email === target);
-      if (drv && !canManage(drv)) return fail(403, "You can only remove yourself or drivers you added.");
-      r[leg] = r[leg].filter((d) => d.email !== target);
-    } else if (action === "claim") {
-      const kid = cfg.kids.find((k) => k.id === body.kidId);
-      if (!kid) return fail(404, "Child not found.");
-      const driverEmail = normEmail(body.driver || email);
-      const drv = r[leg].find((d) => d.email === driverEmail);
-      if (!drv) return fail(400, "Sign up to drive first.");
-      if (!canManage(drv)) return fail(403, "You can only change your own car.");
-      if (body.add === false) drv.kids = drv.kids.filter((k) => k !== kid.id);
-      else {
-        const other = r[leg].find((d) => d.kids.includes(kid.id));
-        if (other && other !== drv) return fail(409, `${kid.name} is already riding with ${other.name}.`);
-        if (!drv.kids.includes(kid.id)) {
-          if (drv.kids.length >= drv.seats) return fail(409, "That car is full.");
-          drv.kids.push(kid.id);
+    try {
+      if (action === "drive") {
+        const seats = seatsOf(body.seats);
+        const target = normEmail(body.driver || email);
+        const existing = cars.find((d) => d.email === target);
+        if (existing) {
+          if (!canManage(existing)) return fail(403, "You can only change your own car.");
+          if (existing.kids.length > seats) return fail(400, `That car already has ${existing.kids.length} kids. Remove some before lowering seats.`);
+          await c.execute({ sql: "UPDATE cars SET seats = ? WHERE id = ?", args: [seats, existing.id] });
+        } else {
+          if (target !== email) return fail(404, "Driver not found.");
+          if (!profile.name) return fail(400, "Add your name first (your initials, top right → My info).");
+          await c.execute({
+            sql: "INSERT INTO cars (rehearsal_id, leg, driver_id, seats) VALUES (?, ?, (SELECT id FROM users WHERE email = ?), ?) ON CONFLICT DO NOTHING",
+            args: [rehearsal, leg, email, seats],
+          });
         }
-      }
-    } else return fail(404, "Not found.");
-
-    await s.set(`rides/${date.id}`, r);
+      } else if (action === "add-driver") {
+        if (!admin) return fail(403, "Only admins can add a driver for someone else. Use I can drive to sign yourself up.");
+        // Add another parent as a driver (e.g. someone who offered by text).
+        const name = clean(body.name, 60);
+        if (!name) return fail(400, "Enter the driver's name.");
+        await c.batch([
+          { sql: "INSERT INTO users (email) VALUES (?) ON CONFLICT DO NOTHING", args: [email] },
+          {
+            sql: "INSERT INTO cars (rehearsal_id, leg, guest_name, guest_phone, seats, added_by_id) VALUES (?, ?, ?, ?, ?, (SELECT id FROM users WHERE email = ?))",
+            args: [rehearsal, leg, name, clean(body.phone, 30), seatsOf(body.seats), email],
+          },
+        ], "write");
+      } else if (action === "withdraw") {
+        const target = normEmail(body.email || email);
+        const drv = cars.find((d) => d.email === target);
+        if (drv && !canManage(drv)) return fail(403, "You can only remove yourself or drivers you added.");
+        if (drv) await c.batch([
+          { sql: "DELETE FROM car_kids WHERE car_id = ?", args: [drv.id] },
+          { sql: "DELETE FROM cars WHERE id = ?", args: [drv.id] },
+        ], "write");
+      } else if (action === "claim") {
+        const kid = cfg.kids.find((k) => k.id === Number(body.kidId));
+        if (!kid) return fail(404, "Child not found.");
+        const driverEmail = normEmail(body.driver || email);
+        const drv = cars.find((d) => d.email === driverEmail);
+        if (!drv) return fail(400, "Sign up to drive first.");
+        if (!canManage(drv)) return fail(403, "You can only change your own car.");
+        if (body.add === false) await c.execute({ sql: "DELETE FROM car_kids WHERE car_id = ? AND kid_id = ?", args: [drv.id, kid.id] });
+        else {
+          const other = cars.find((d) => d.kids.includes(kid.id));
+          if (other && other !== drv) return fail(409, `${kid.name} is already riding with ${other.name}.`);
+          if (!drv.kids.includes(kid.id)) {
+            if (drv.kids.length >= drv.seats) return fail(409, "That car is full.");
+            await c.execute({ sql: "INSERT INTO car_kids (car_id, kid_id, rehearsal_id, leg) VALUES (?, ?, ?, ?)", args: [drv.id, kid.id, rehearsal, leg] });
+          }
+        }
+      } else return fail(404, "Not found.");
+    } catch (err) {
+      // Someone else changed the same car at the same moment (e.g. put this kid in another car).
+      if (isConstraintError(err)) return fail(409, "That ride just changed. Please refresh and try again.");
+      throw err;
+    }
     return json({ ok: true });
   }
 
   // ----- admin routes -----
   if (route === "/admin/config" && method === "POST") {
     if (!admin) return fail(403, "Admins only.");
-    const slug = (n: unknown) => clean(n, 40).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "kid";
     const next: Config = { ...cfg };
     for (const f of ["title", "school", "location", "rehearsal", "dropoffNote", "pickupNote"] as const) if (body[f] !== undefined) next[f] = clean(body[f], 120);
     if (Array.isArray(body.kids)) {
-      const used = new Set<string>();
+      const seen = new Set<number>();
       next.kids = body.kids.filter((k: any) => clean(k.name)).map((k: any) => {
-        let id = k.id && cfg.kids.some((c) => c.id === k.id) ? k.id : slug(k.name);
-        while (used.has(id)) id += "-2";
-        used.add(id);
-        return { id, name: clean(k.name, 40), parents: (k.parents || []).map(normEmail).filter((e: string) => e.includes("@")).slice(0, 4) };
+        // Existing kids keep their id; anything else is a new kid (id 0 until the database assigns one).
+        const id = cfg.kids.some((c) => c.id === Number(k.id)) && !seen.has(Number(k.id)) ? Number(k.id) : 0;
+        seen.add(id);
+        return { id, name: clean(k.name, 40), parents: [...new Set<string>((k.parents || []).map(normEmail).filter((e: string) => e.includes("@")))].slice(0, 4) };
       });
     }
-    if (Array.isArray(body.admins)) next.admins = body.admins.map(normEmail).filter((e: string) => e.includes("@"));
-    if (Array.isArray(body.dates)) next.dates = body.dates
+    if (Array.isArray(body.admins)) next.admins = [...new Set<string>(body.admins.map(normEmail).filter((e: string) => e.includes("@")))];
+    if (Array.isArray(body.dates)) next.dates = [...new Map<string, RehearsalDate>(body.dates
       .filter((d: any) => /^\d{4}-\d{2}-\d{2}$/.test(d.id))
-      .map((d: any): RehearsalDate => ({ id: d.id, weekday: new Date(d.id + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "long", timeZone: "UTC" }), note: clean(d.note), flag: d.flag === "confirm" ? "confirm" : d.flag === "cancelled" ? "cancelled" : "" }))
+      .map((d: any): [string, RehearsalDate] => [d.id, { id: d.id, weekday: weekdayOf(d.id), note: clean(d.note), flag: d.flag === "confirm" ? "confirm" : d.flag === "cancelled" ? "cancelled" : "" }])).values()]
       .sort((a: RehearsalDate, b: RehearsalDate) => a.id.localeCompare(b.id));
     if (Array.isArray(body.importantDates)) next.importantDates = body.importantDates
       .filter((d: any) => /^\d{4}-\d{2}-\d{2}$/.test(d.date) && clean(d.title))
@@ -295,15 +363,46 @@ export async function handle(req: Request): Promise<Response> {
       .sort((a: { date: string }, b: { date: string }) => a.date.localeCompare(b.date));
     // Don't let an admin lock everyone out.
     if (!isAdmin(next, email)) return fail(400, "You can't remove yourself as an admin.");
-    await s.set("config", next);
+
+    const w: InStatement[] = [{
+      sql: "UPDATE settings SET title = ?, school = ?, location = ?, rehearsal = ?, dropoff_note = ?, pickup_note = ?",
+      args: [next.title, next.school, next.location, next.rehearsal, next.dropoffNote, next.pickupNote],
+    }];
+    // Removing a kid removes their needs, parent links and seats in cars.
+    for (const k of cfg.kids) if (!next.kids.some((n) => n.id === k.id)) {
+      for (const t of ["car_kids", "kid_need_overrides", "kid_usual_needs", "kid_parents"]) w.push({ sql: `DELETE FROM ${t} WHERE kid_id = ?`, args: [k.id] });
+      w.push({ sql: "DELETE FROM kids WHERE id = ?", args: [k.id] });
+    }
+    next.kids.forEach((k, i) => {
+      // A new kid's id is the newest one in the table: ids only go up, and the batch runs as one transaction.
+      const kidId = k.id ? { sql: "?", args: [k.id] } : { sql: "(SELECT max(id) FROM kids)", args: [] };
+      if (k.id) w.push({ sql: "UPDATE kids SET name = ?, position = ? WHERE id = ?", args: [k.name, i, k.id] });
+      else w.push({ sql: "INSERT INTO kids (name, position) VALUES (?, ?)", args: [k.name, i] });
+      w.push({ sql: `DELETE FROM kid_parents WHERE kid_id = ${kidId.sql}`, args: kidId.args });
+      (k.parents || []).forEach((e, j) => w.push(
+        { sql: "INSERT INTO users (email) VALUES (?) ON CONFLICT DO NOTHING", args: [e] },
+        { sql: `INSERT INTO kid_parents (kid_id, user_id, position) VALUES (${kidId.sql}, (SELECT id FROM users WHERE email = ?), ?)`, args: [...kidId.args, e, j] },
+      ));
+    });
+    w.push({ sql: "UPDATE users SET is_admin = 0 WHERE is_admin = 1", args: [] });
+    for (const e of next.admins) w.push({ sql: "INSERT INTO users (email, is_admin) VALUES (?, 1) ON CONFLICT (email) DO UPDATE SET is_admin = 1", args: [e] });
+    // Removing a rehearsal date removes its cars and any week-specific ride changes.
+    for (const d of cfg.dates) if (!next.dates.some((n) => n.id === d.id)) {
+      for (const t of ["car_kids", "cars", "kid_need_overrides"]) w.push({ sql: `DELETE FROM ${t} WHERE rehearsal_id = ?`, args: [cfg.rehearsalId[d.id]] });
+      w.push({ sql: "DELETE FROM rehearsal_dates WHERE id = ?", args: [cfg.rehearsalId[d.id]] });
+    }
+    for (const d of next.dates) w.push({ sql: "INSERT INTO rehearsal_dates (date, note, flag) VALUES (?, ?, ?) ON CONFLICT (date) DO UPDATE SET note = excluded.note, flag = excluded.flag", args: [d.id, d.note, d.flag] });
+    w.push({ sql: "DELETE FROM important_dates", args: [] });
+    for (const d of next.importantDates) w.push({ sql: "INSERT INTO important_dates (date, title, detail) VALUES (?, ?, ?)", args: [d.date, d.title, d.detail] });
+    await c.batch(w, "write");
     return json({ ok: true });
   }
 
   if (route === "/admin/export.csv" && method === "GET") {
     if (!admin) return fail(403, "Admins only.");
-    const { needs, rides } = await loadAll(s, cfg);
+    const [needs, rides] = await Promise.all([loadNeeds(c, cfg), loadRides(c, cfg)]);
     const sched = buildSchedule(cfg, needs, rides);
-    const name = (id: string) => cfg.kids.find((k) => k.id === id)?.name || id;
+    const name = (id: number) => cfg.kids.find((k) => k.id === id)?.name || String(id);
     const q = (v: unknown) => `"${String(v).replace(/"/g, '""')}"`;
     const rows = [["Date", "Day", "Notes", "Drop-off still need", "Drop-off drivers", "Pickup still need", "Pickup drivers"]];
     for (const d of sched) rows.push([

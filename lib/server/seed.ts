@@ -2,11 +2,23 @@
 // This is loaded once, the first time the site runs. After that, edit everything
 // from the Admin page on the site.
 
-import type { Config, KidNeeds, Ride, RehearsalDate } from "../types";
+import type { KidNeeds, RehearsalDate } from "../types";
+
+// The data is in the format the site first stored it in (kids identified by a name-based id like "james").
+// lib/server/db.ts copies it, or a site's older saved data in the same format, into the database tables.
+export interface OldConfig {
+  title: string; school: string; location?: string; rehearsal: string; dropoffNote: string; pickupNote: string;
+  kids: { id: string; name: string; parents?: string[] }[];
+  admins?: string[];
+  dates: RehearsalDate[];
+  importantDates?: { date: string; title: string; detail: string }[];
+}
+export interface OldDriver { email: string; name: string; seats: number; kids: string[]; phone?: string; addedBy?: string }
+export type OldRide = Record<"dropoff" | "pickup", OldDriver[]>;
 
 const d = (id: string, weekday: string, note = "", flag: RehearsalDate["flag"] = ""): RehearsalDate => ({ id, weekday, note, flag });
 
-export const SEED_CONFIG: Config = {
+export const SEED_CONFIG: OldConfig = {
   title: "4th Grade Band Carpool",
   school: "Park View Elementary School",
   location: "Glenn Westlake Middle School",
@@ -71,7 +83,7 @@ export const SEED_NEEDS: Record<string, KidNeeds> = {
 };
 
 // Driver signups already in the sheet.
-export const SEED_RIDES: Record<string, Ride> = {
+export const SEED_RIDES: Record<string, OldRide> = {
   "2026-10-06": { dropoff: [{ email: "jill@snacksdesign.com", name: "Jill", seats: 4, kids: ["james"] }], pickup: [] },
   "2026-10-13": { dropoff: [{ email: "jill@snacksdesign.com", name: "Jill", seats: 4, kids: ["james", "will"] }], pickup: [] },
 };

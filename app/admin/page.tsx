@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useSignedIn } from "@/lib/client/portal";
 import type { ImportantDate, RehearsalDate } from "@/lib/types";
 
-interface KidRow { id: string; name: string; parents: string }
+interface KidRow { id: number | null; name: string; parents: string } // id is null for a new child
 type DateRow = Pick<RehearsalDate, "id" | "note" | "flag">;
 const TEXT_FIELDS = [
   ["title", "Site title"], ["school", "School"], ["location", "Rehearsal location"],
@@ -61,13 +61,12 @@ export default function AdminPage() {
             <button className="btn link" onClick={() => remove(kids, setKids, i)}>Remove</button>
           </div>
         ))}
-        <button className="btn small ghost" onClick={() => setKids([...kids, { id: "", name: "", parents: "" }])}>+ Add child</button>
+        <button className="btn small ghost" onClick={() => setKids([...kids, { id: null, name: "", parents: "" }])}>+ Add child</button>
       </div>
 
       <div className="card">
         <h3>Admins</h3>
         <div className="field"><label htmlFor="admins">Admin emails (comma separated)</label><input id="admins" value={admins} onChange={(e) => setAdmins(e.target.value)} /></div>
-        {!!c.envAdmins?.length && <p className="muted">Always admin (set in Vercel): {c.envAdmins.join(", ")}</p>}
       </div>
 
       <div className="card">
