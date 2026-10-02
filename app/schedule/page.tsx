@@ -4,14 +4,15 @@ import { useSearchParams } from "next/navigation";
 import { useSignedIn } from "@/lib/client/portal";
 import { isPast, needsDriver } from "@/lib/client/format";
 import { RehearsalCard } from "@/components/Rehearsal";
-import { LEGS, type Rehearsal } from "@/lib/types";
+import { DEFAULT_REGULAR_DAY, LEGS, type Rehearsal } from "@/lib/types";
 
-type Filter = "all" | "needs" | "mine";
-const FILTERS: [Filter, string][] = [["all", "All"], ["needs", "Needs drivers"], ["mine", "My rides"]];
+type Filter = "all" | "needs" | "mine" | "kids";
+const FILTERS: [Filter, string][] = [["all", "All"], ["needs", "Needs drivers"], ["mine", "My rides"], ["kids", "My child's schedule"]];
 const EMPTY: Record<Filter, string> = {
   all: "No rehearsals to show.",
   needs: "Every upcoming rehearsal has enough drivers.",
   mine: "You haven't signed up to drive for any upcoming rehearsals yet. Tap I can drive on a rehearsal to volunteer.",
+  kids: "Your child doesn't have any upcoming rehearsals.",
 };
 
 export default function SchedulePage() {
@@ -44,9 +45,18 @@ function Schedule({ jumpTo, initialFilter }: { jumpTo: string | null; initialFil
   // Rehearsals where you signed up to drive (either leg).
   const isMine = (d: Rehearsal) => LEGS.some((l) => d[l].drivers.some((x) => x.email === S.me.email));
 
+  // Rehearsals your child goes to: their regular day, all-school rehearsals, and any other week you asked for a ride.
+  const hasKids = S.me.kids.length > 0;
+  const isKids = (d: Rehearsal) => S.me.kids.some((k) => {
+    const n = S.needs[k];
+    const ov = n?.overrides[d.id];
+    return (ov && ov !== "none") || d.allSchools || d.weekday === (n?.regularDay || DEFAULT_REGULAR_DAY);
+  });
+
   let list = S.schedule.filter((d) => !isPast(d.id));
   if (filter === "needs") list = list.filter(needsDriver);
   if (filter === "mine") list = list.filter(isMine);
+  if (filter === "kids") list = list.filter(isKids);
 
   return (
     <div className="wrap page">
@@ -57,7 +67,7 @@ function Schedule({ jumpTo, initialFilter }: { jumpTo: string | null; initialFil
         </div>
         <div className="filters">
           <div className="seg filter-seg" role="tablist" aria-label="Filter rehearsals">
-            {FILTERS.map(([id, label]) => (
+            {FILTERS.filter(([id]) => id !== "kids" || hasKids).map(([id, label]) => (
               <button key={id} role="tab" aria-selected={filter === id} className={filter === id ? "on" : ""} onClick={() => setFilter(id)}>{label}</button>
             ))}
           </div>
