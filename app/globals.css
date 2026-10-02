@@ -62,7 +62,6 @@ h2 { font: 600 1.9rem/1.1 var(--font-display); text-transform: uppercase; letter
 .hero { background: #000; color: #fff; }
 .hero .wrap { padding-block: 44px 56px; }
 .hero-compact .wrap { padding-block: 28px 56px; }
-.hero-compact .next-box { margin-top: 16px; }
 .eyebrow { color: var(--gold); text-transform: uppercase; letter-spacing: .18em; font-weight: 700; font-size: .78rem; }
 .hero-kicker { font: 600 clamp(1.1rem, 2.4vw, 1.5rem) var(--font-display); text-transform: uppercase; letter-spacing: .12em; margin-top: 14px; }
 .hero-script { font: 400 clamp(3.2rem, 9vw, 6rem)/1 var(--font-script); margin: 0; color: #fff; }
@@ -70,17 +69,6 @@ h2 { font: 600 1.9rem/1.1 var(--font-display); text-transform: uppercase; letter
 .brush path { fill: var(--gold); }
 .hero-copy { color: #dcd9cf; font-size: 1.02rem; max-width: 62ch; margin: 0; }
 .hero-copy b { color: #fff; }
-.next-box { display: flex; flex-direction: column; gap: 4px; margin-top: 22px; max-width: 560px; background: rgba(255,255,255,.06); border: 1px solid rgba(245,197,66,.35); border-left: 6px solid var(--gold); padding: 14px 18px; }
-.next-label { color: var(--gold); text-transform: uppercase; letter-spacing: .14em; font-size: .72rem; font-weight: 700; }
-.next-item { display: flex; flex-direction: column; gap: 4px; }
-.next-multi { max-width: 960px; }
-/* A week with more than one rehearsal: side by side, stacked on phones (see 760px below). */
-.next-items { display: flex; gap: 20px; }
-.next-items .next-item { flex: 1 1 0; min-width: 0; }
-.next-item + .next-item { border-left: 1px solid rgba(245,197,66,.25); padding-left: 20px; }
-.next-box strong { font-size: 1.15rem; }
-.next-note { color: #dcd9cf; }
-.next-status { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; margin-top: 4px; }
 
 /* yellow blocks (like the school site's three tiles) */
 .cta-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin: -30px auto 40px; position: relative; }
@@ -146,7 +134,6 @@ body.signed-out .login-card { border-left-color: var(--ink); border-right-color:
 .rh-title { flex: 1; min-width: 180px; }
 .rh-title strong { font-size: 1.05rem; }
 .tag { display: inline-block; font-size: .72rem; font-weight: 700; padding: 2px 8px; border-radius: 3px; background: var(--gold-soft); color: #6b5100; margin-left: 6px; vertical-align: middle; text-transform: uppercase; letter-spacing: .03em; }
-.next-status .tag { margin-left: 0; }
 .tag.warn { background: var(--blue-soft); color: var(--blue); }
 .tag.ok { background: var(--green-soft); color: var(--green); }
 .legs { display: grid; grid-template-columns: 1fr 1fr; }
@@ -170,8 +157,8 @@ button.kid.need:hover { border-color: var(--blue); }
 .addr-item { display: flex; flex-direction: column; gap: 2px; padding: 10px 0; border-bottom: 1px solid var(--line); }
 .addr-item a { font-weight: 600; font-size: .85rem; }
 .addr { font-weight: 500; }
-.upcoming-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 28px; margin-bottom: 10px; }
-.upcoming-head .section-title { margin: 0; }
+.section-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 28px; margin-bottom: 10px; }
+.section-head .section-title { margin: 0; }
 .upcoming { padding: 0; }
 .up-row { display: flex; align-items: center; gap: 16px; padding: 12px 18px; text-decoration: none; color: inherit; flex-wrap: wrap; }
 .up-row + .up-row { border-top: 1px solid var(--line); }
@@ -197,9 +184,12 @@ button.kid.need:hover { border-color: var(--blue); }
 .seg button.on { background: var(--gold); font-weight: 700; }
 .day-switch { display: inline-flex; align-items: center; gap: 10px; font-size: .9rem; color: var(--muted); }
 .day-switch .on { color: var(--ink); font-weight: 700; }
-.day-switch [role="switch"] { position: relative; width: 48px; height: 26px; border: 2px solid var(--ink); border-radius: 999px; background: var(--gold); cursor: pointer; padding: 0; }
-.day-switch [role="switch"]::after { content: ""; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: var(--ink); transition: transform .15s; }
-.day-switch [role="switch"][aria-checked="true"]::after { transform: translateX(22px); }
+.switch { position: relative; flex: none; width: 48px; height: 26px; border: 2px solid var(--ink); border-radius: 999px; background: #fff; cursor: pointer; padding: 0; }
+.switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: var(--ink); transition: transform .15s; }
+.switch[aria-checked="true"] { background: var(--gold); }
+.switch[aria-checked="true"]::after { transform: translateX(22px); }
+.day-switch .switch { background: var(--gold); } /* picks between two days, so neither side is "off" */
+.switch-label { display: inline-flex; align-items: center; gap: 10px; margin: 0; font-weight: 500; font-size: .9rem; cursor: pointer; }
 .table-wrap { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; font-size: .9rem; }
 th, td { text-align: left; padding: 9px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
@@ -256,20 +246,14 @@ dialog::backdrop { background: rgba(0,0,0,.55); }
   .filters { width: 100%; }
 }
 @media (max-width: 760px) {
-  .next-items { flex-direction: column; gap: 10px; }
-  .next-item + .next-item { border-left: 0; padding-left: 0; border-top: 1px solid rgba(245,197,66,.25); padding-top: 10px; }
   .wrap { padding-left: 16px; padding-right: 16px; }
   .hero .wrap { padding-block: 30px 50px; }
   .cta-row { display: none; }   /* the menu covers these on phones */
   .hero-compact .wrap { padding-block: 24px 28px; }
-  .hero-compact + .wrap .section-title:first-of-type { margin-top: 24px; }
   .legs, .grid-2 { grid-template-columns: 1fr; }
   .leg + .leg { border-left: 0; border-top: 1px solid var(--line); }
   .footer-grid { grid-template-columns: 1fr; }
   .up-status { align-items: flex-start; }
-  .upcoming-head .btn { display: none; }
-  .next-status { flex-direction: column; align-items: flex-start; }
-  .next-status > span { display: flex; align-items: center; gap: 8px; }
   /* week-by-week: each date becomes a compact card */
   .week-table, .week-table tbody { display: block; }
   .week-table thead { display: none; }

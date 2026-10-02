@@ -18,7 +18,6 @@ export function DateBadge({ id }: { id: string }) {
 }
 
 export function FlagTag({ flag }: { flag: Rehearsal["flag"] }) {
-  if (flag === "confirm") return <span className="tag warn">Confirm rehearsal</span>;
   if (flag === "cancelled") return <span className="tag warn">Cancelled</span>;
   return null;
 }

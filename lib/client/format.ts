@@ -1,5 +1,5 @@
 // Date and display helpers for the browser.
-import type { Leg, Need, Driver } from "../types";
+import { DEFAULT_REGULAR_DAY, type Driver, type KidNeeds, type Leg, type Need, type RehearsalDate } from "../types";
 
 export const NEED_LABEL: Record<Need, string> = {
   both: "Drop-off & pickup",
@@ -26,6 +26,12 @@ export function todayId(): string {
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 }
 export const isPast = (id: string) => id < todayId();
+
+/** A child goes to their regular day's rehearsals, every all-school rehearsal, and any other week a ride was asked for. */
+export function goesTo(n: KidNeeds | undefined, d: RehearsalDate): boolean {
+  const ov = n?.overrides[d.id];
+  return (!!ov && ov !== "none") || d.allSchools || d.weekday === (n?.regularDay || DEFAULT_REGULAR_DAY);
+}
 
 export const openSeats = (drivers: Driver[]) => drivers.reduce((t, x) => t + Math.max(0, x.seats - x.kids.length), 0);
 

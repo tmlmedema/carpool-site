@@ -60,7 +60,7 @@ export default function MyChildPage() {
           <label id="regular-day">Regular rehearsal day</label>
           <div className="day-switch">
             <span className={regularDay === "Tuesday" ? "on" : ""}>Tuesdays</span>
-            <button type="button" role="switch" aria-labelledby="regular-day" aria-checked={regularDay === "Wednesday"}
+            <button type="button" role="switch" className="switch" aria-labelledby="regular-day" aria-checked={regularDay === "Wednesday"}
               onClick={() => act("/needs", { kidId: sel, regularDay: otherDay }, `Regular day set to ${otherDay}s`)} />
             <span className={regularDay === "Wednesday" ? "on" : ""}>Wednesdays</span>
           </div>

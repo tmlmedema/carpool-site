@@ -27,7 +27,7 @@ export default function DatesPage() {
               {S.schedule.map((d) => (
                 <tr key={d.id} className={isPast(d.id) ? "past" : ""}>
                   <td>{fmt(d.id, { weekday: "short", month: "short", day: "numeric", year: "numeric" })}</td>
-                  <td>{d.note}{d.flag === "confirm" && <> <span className="tag warn">Confirm</span></>}</td>
+                  <td>{d.note}</td>
                 </tr>
               ))}
             </tbody>
