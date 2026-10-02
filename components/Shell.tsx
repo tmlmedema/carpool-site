@@ -12,7 +12,7 @@ import { ProfileForm } from "./ProfileForm";
 const NAV = [
   { href: "/", label: "Home" },
   { href: "/schedule", label: "Carpool Schedule" },
-  { href: "/my-child", label: "My Child's Rides" },
+  { href: "/my-child", label: "My Child's Schedule" },
   { href: "/dates", label: "Important Dates" },
 ];
 

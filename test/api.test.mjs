@@ -17,12 +17,17 @@ assert.ok(admin, "admin can log in");
 let st = (await call(admin, "/state")).data;
 // Kids have database ids; look them up by name.
 const K = Object.fromEntries(st.config.kids.map((k) => [k.name.toLowerCase(), k.id]));
-assert.equal(st.schedule.length, 30);
-assert.deepEqual(st.schedule[0].dropoff.stillNeed, [K.will, K.victoria]);
-assert.deepEqual(st.schedule[1].dropoff.stillNeed, []);
-assert.deepEqual(st.schedule[1].pickup.stillNeed, [K.james, K.will]);
-assert.deepEqual(st.schedule[10].dropoff.stillNeed, [K.james, K.victoria]); // Wed
-assert.deepEqual(st.schedule[10].pickup.stillNeed, [K.will, K.victoria]);
+const at = (st, date) => st.schedule.find((d) => d.id === date);
+assert.equal(st.schedule.length, 51, "30 seeded dates plus a Wednesday after each of the 21 Tuesdays");
+assert.deepEqual(at(st, "2026-10-06").dropoff.stillNeed, [K.will, K.victoria]);
+assert.deepEqual(at(st, "2026-10-13").dropoff.stillNeed, []);
+assert.deepEqual(at(st, "2026-10-13").pickup.stillNeed, [K.james, K.will]);
+assert.equal(at(st, "2026-12-16").allSchools, true, "seeded Wednesdays are all-school");
+assert.deepEqual(at(st, "2026-12-16").dropoff.stillNeed, [K.james, K.victoria]);
+assert.deepEqual(at(st, "2026-12-16").pickup.stillNeed, [K.will, K.victoria]);
+assert.equal(at(st, "2026-10-07").allSchools, false, "added Wednesday is a regular day");
+assert.equal(at(st, "2026-10-07").note, "Wednesday (Non Park View day)");
+assert.deepEqual(at(st, "2026-10-07").dropoff.needing, [], "nobody's regular day is Wednesday yet");
 
 assert.equal(await login("pat@example.com"), null, "unknown parent gets no link");
 const denied = await fetch(B + "/api/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: "pat@example.com" }) });
@@ -37,6 +42,16 @@ assert.deepEqual(Object.keys(st.needs), [String(K.will)], "parent only sees own 
 assert.equal(st.config.kids[0].parents, undefined, "parent emails hidden from non-admin");
 assert.equal((await call(pat, "/needs", { kidId: K.james, usual: { Tuesday: "none" } })).status, 403);
 assert.equal((await call(pat, "/needs", { kidId: K.will, overrides: { "2026-10-20": "pickup" } })).status, 200);
+assert.equal((await call(pat, "/needs", { kidId: K.will, regularDay: "Monday" })).status, 400, "regular day must be a rehearsal weekday");
+assert.equal((await call(pat, "/needs", { kidId: K.will, regularDay: "Wednesday", usual: { Wednesday: "both" } })).status, 200);
+st = (await call(pat, "/state")).data;
+assert.equal(st.needs[K.will].regularDay, "Wednesday");
+assert.ok(at(st, "2026-10-21").dropoff.needing.includes(K.will), "Wednesday kid rides on regular Wednesdays");
+assert.ok(!at(st, "2026-10-27").dropoff.needing.includes(K.will), "and not on Tuesdays");
+assert.ok(at(st, "2026-12-16").pickup.needing.includes(K.will), "and still on all-school Wednesdays");
+assert.equal((await call(pat, "/needs", { kidId: K.will, overrides: { "2026-10-27": "dropoff" } })).status, 200);
+assert.ok(at((await call(pat, "/state")).data, "2026-10-27").dropoff.needing.includes(K.will), "a single-week change counts on the other day");
+assert.equal((await call(pat, "/needs", { kidId: K.will, regularDay: "Tuesday", overrides: { "2026-10-27": null } })).status, 200);
 assert.equal((await call(pat, "/admin/config", { admins: ["pat@example.com"] })).status, 403);
 assert.equal((await call(pat, "/rides/drive", { date: "2026-10-20", leg: "dropoff", seats: 2 })).status, 400, "needs name first");
 await call(pat, "/profile", { name: "Pat", phone: "555-0100" });

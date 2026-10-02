@@ -10,13 +10,13 @@ export interface OldConfig {
   title: string; school: string; location?: string; rehearsal: string; dropoffNote: string; pickupNote: string;
   kids: { id: string; name: string; parents?: string[] }[];
   admins?: string[];
-  dates: RehearsalDate[];
+  dates: Omit<RehearsalDate, "allSchools">[]; // db.ts marks the all-school dates after copying
   importantDates?: { date: string; title: string; detail: string }[];
 }
 export interface OldDriver { email: string; name: string; seats: number; kids: string[]; phone?: string; addedBy?: string }
 export type OldRide = Record<"dropoff" | "pickup", OldDriver[]>;
 
-const d = (id: string, weekday: string, note = "", flag: RehearsalDate["flag"] = ""): RehearsalDate => ({ id, weekday, note, flag });
+const d = (id: string, weekday: string, note = "", flag: RehearsalDate["flag"] = ""): OldConfig["dates"][number] => ({ id, weekday, note, flag });
 
 export const SEED_CONFIG: OldConfig = {
   title: "4th Grade Band Carpool",

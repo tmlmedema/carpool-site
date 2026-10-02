@@ -1,5 +1,5 @@
 // Date and display helpers for the browser.
-import type { Leg, Need, Rehearsal, Driver } from "../types";
+import { DEFAULT_REGULAR_DAY, type Driver, type KidNeeds, type Leg, type Need, type RehearsalDate } from "../types";
 
 export const NEED_LABEL: Record<Need, string> = {
   both: "Drop-off & pickup",
@@ -14,6 +14,12 @@ const parse = (id: string) => new Date(id + "T12:00:00");
 export const fmt = (id: string, opts: Intl.DateTimeFormatOptions) => parse(id).toLocaleDateString("en-US", opts);
 export const longDate = (id: string) => fmt(id, { weekday: "long", month: "long", day: "numeric" });
 export const shortDate = (id: string) => fmt(id, { weekday: "short", month: "short", day: "numeric" });
+/** The Saturday ending the week (Sunday to Saturday) that a date falls in, as YYYY-MM-DD. */
+export function weekEndOf(id: string): string {
+  const d = parse(id);
+  d.setDate(d.getDate() + 6 - d.getDay());
+  return d.toLocaleDateString("en-CA");
+}
 
 export function todayId(): string {
   const d = new Date();
@@ -21,11 +27,13 @@ export function todayId(): string {
 }
 export const isPast = (id: string) => id < todayId();
 
-export const openSeats = (drivers: Driver[]) => drivers.reduce((t, x) => t + Math.max(0, x.seats - x.kids.length), 0);
+/** A child goes to their regular day's rehearsals, every all-school rehearsal, and any other week a ride was asked for. */
+export function goesTo(n: KidNeeds | undefined, d: RehearsalDate): boolean {
+  const ov = n?.overrides[d.id];
+  return (!!ov && ov !== "none") || d.allSchools || d.weekday === (n?.regularDay || DEFAULT_REGULAR_DAY);
+}
 
-/** More kids still need a ride than there are open seats on this leg. */
-export const legShort = (d: Rehearsal, leg: Leg) => d[leg].stillNeed.length > openSeats(d[leg].drivers);
-export const needsDriver = (d: Rehearsal) => legShort(d, "dropoff") || legShort(d, "pickup");
+export const openSeats = (drivers: Driver[]) => drivers.reduce((t, x) => t + Math.max(0, x.seats - x.kids.length), 0);
 
 export function initials(nameOrEmail: string): string {
   const base = nameOrEmail.split("@")[0].replace(/[._-]+/g, " ").trim();
