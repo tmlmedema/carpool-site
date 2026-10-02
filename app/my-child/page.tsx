@@ -44,7 +44,7 @@ export default function MyChildPage() {
         <h3>{kidName(sel)}&apos;s usual rides</h3>
         {weekdays.map((day) => (
           <div className="field" key={day}>
-            <label>{day} rehearsals</label>
+            <label>{day === "Wednesday" ? "All school Wednesday" : day} rehearsals</label>
             <div className="seg" role="group" aria-label={`Usual ${day} ride`}>
               {NEED_VALUES.map((v) => (
                 <button key={v} className={(n.usual[day] || "none") === v ? "on" : ""}
