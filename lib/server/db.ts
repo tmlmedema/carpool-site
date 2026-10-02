@@ -109,6 +109,8 @@ async function upgrade(c: Client) {
     // Each regular Tuesday gets a Wednesday for kids whose regular day is Wednesday.
     "INSERT OR IGNORE INTO rehearsal_dates (date, note) SELECT date(date, '+1 day'), 'Wednesday (Non Park View day)' FROM rehearsal_dates WHERE strftime('%w', date) = '2'",
   ], "write");
+  // Notes used to end with a reminder to confirm the rehearsal; drop it. Matches nothing once it's gone.
+  await c.execute("UPDATE rehearsal_dates SET note = replace(replace(note, ' • Confirm whether rehearsal is held', ''), ' • Confirm rehearsal', '') WHERE note LIKE '%Confirm%rehearsal%'");
 }
 
 // Admins are users with is_admin = 1, managed in Admin. ADMIN_EMAILS only matters while nobody is an admin

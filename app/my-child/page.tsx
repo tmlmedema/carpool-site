@@ -62,7 +62,7 @@ export default function MyChildPage() {
             <span className={regularDay === "Tuesday" ? "on" : ""}>Tuesdays</span>
             <button type="button" role="switch" className="switch" aria-labelledby="regular-day" aria-checked={regularDay === "Wednesday"}
               onClick={() => act("/needs", { kidId: sel, regularDay: otherDay }, `Regular day set to ${otherDay}s`)} />
-            <span className={regularDay === "Wednesday" ? "on" : ""}>Wednesdays</span>
+            <span className={regularDay === "Wednesday" ? "on" : ""}>Wednesdays (Non Park View days)</span>
           </div>
         </div>
         <UsualRow label={`${regularDay} rehearsals`} need={n.usual[regularDay]} onPick={(v) => act("/needs", { kidId: sel, usual: { [regularDay]: v } }, "Usual rides updated")} />
