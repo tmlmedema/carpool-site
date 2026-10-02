@@ -36,7 +36,7 @@ export default function MyChildPage() {
   const cover = (d: Rehearsal, leg: Leg) => {
     const dr = d[leg].drivers.find((x) => x.kids.includes(sel));
     if (dr) return <span className="tag ok">{dr.name}</span>;
-    if (d[leg].needing.includes(sel)) return <span className="tag warn">Needs driver</span>;
+    if (d[leg].needing.includes(sel)) return <Link href={`/schedule?d=${d.id}`} className="tag warn" aria-label={`Needs driver, open ${shortDate(d.id)} on the schedule`}>Needs driver</Link>;
     return <span className="muted">—</span>;
   };
 
