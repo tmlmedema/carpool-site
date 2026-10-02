@@ -5,10 +5,10 @@ import { useSignedIn } from "@/lib/client/portal";
 import { goesTo, isPast, weekEndOf } from "@/lib/client/format";
 import { RehearsalCard, UpcomingRow } from "@/components/Rehearsal";
 
-// "Only show my child's schedule" is on until a parent turns it off; the choice is remembered in this browser.
+// "Only show my child's schedule" is off until a parent turns it on; the choice is remembered in this browser.
 const onlyMineKey = (email: string) => `onlyMyChild:${email}`;
 function readOnlyMine(email: string) {
-  try { return localStorage.getItem(onlyMineKey(email)) !== "off"; } catch { return true; }
+  try { return localStorage.getItem(onlyMineKey(email)) === "on"; } catch { return false; }
 }
 
 export default function HomePage() {
