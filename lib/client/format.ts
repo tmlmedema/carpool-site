@@ -14,6 +14,12 @@ const parse = (id: string) => new Date(id + "T12:00:00");
 export const fmt = (id: string, opts: Intl.DateTimeFormatOptions) => parse(id).toLocaleDateString("en-US", opts);
 export const longDate = (id: string) => fmt(id, { weekday: "long", month: "long", day: "numeric" });
 export const shortDate = (id: string) => fmt(id, { weekday: "short", month: "short", day: "numeric" });
+/** The Saturday ending the week (Sunday to Saturday) that a date falls in, as YYYY-MM-DD. */
+export function weekEndOf(id: string): string {
+  const d = parse(id);
+  d.setDate(d.getDate() + 6 - d.getDay());
+  return d.toLocaleDateString("en-CA");
+}
 
 export function todayId(): string {
   const d = new Date();

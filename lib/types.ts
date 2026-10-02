@@ -4,6 +4,10 @@ export type Need = "both" | "dropoff" | "pickup" | "none";
 export type Leg = "dropoff" | "pickup";
 export const LEGS: Leg[] = ["dropoff", "pickup"];
 export const NEED_VALUES: Need[] = ["both", "dropoff", "pickup", "none"];
+// Each child rehearses on one regular day (Tuesday until a parent picks), plus every all-school rehearsal.
+export const REGULAR_DAYS = ["Tuesday", "Wednesday"];
+export const DEFAULT_REGULAR_DAY = "Tuesday";
+export const ALL_SCHOOLS = "all"; // the usual-needs key for all-school rehearsals
 
 export interface Kid {
   id: number;
@@ -16,6 +20,7 @@ export interface RehearsalDate {
   weekday: string; // "Tuesday"
   note: string;
   flag: "" | "confirm" | "cancelled";
+  allSchools: boolean; // a combined rehearsal every child goes to, whatever their regular day
 }
 
 export interface ImportantDate {
@@ -38,8 +43,9 @@ export interface Config {
 }
 
 export interface KidNeeds {
-  usual: Record<string, Need>; // keyed by weekday
+  usual: Record<string, Need>; // keyed by regular weekday, or ALL_SCHOOLS
   overrides: Record<string, Need>; // keyed by date id
+  regularDay?: string; // weekday the child usually rehearses; "" until a parent picks one
 }
 
 export interface Driver {

@@ -1,8 +1,8 @@
 "use client";
 import { useState } from "react";
 import { useSignedIn } from "@/lib/client/portal";
-import { isPast, NEED_LABEL, shortDate } from "@/lib/client/format";
-import { NEED_VALUES, type Leg, type Rehearsal } from "@/lib/types";
+import { fmt, isPast, NEED_LABEL, shortDate } from "@/lib/client/format";
+import { ALL_SCHOOLS, DEFAULT_REGULAR_DAY, NEED_VALUES, REGULAR_DAYS, type Leg, type Need, type Rehearsal } from "@/lib/types";
 
 export default function MyChildPage() {
   const { S, act } = useSignedIn();
@@ -17,7 +17,20 @@ export default function MyChildPage() {
 
   const kidName = (id: number) => S.config.kids.find((k) => k.id === id)?.name || id;
   const n = S.needs[sel] || { usual: {}, overrides: {} };
-  const weekdays = [...new Set(S.schedule.map((d) => d.weekday))];
+  const regularDay = n.regularDay || DEFAULT_REGULAR_DAY;
+  const otherDay = REGULAR_DAYS.find((day) => day !== regularDay)!;
+  // Usual rides cover all-school rehearsals and the regular day; other dates only get a ride when changed for that week.
+  const usualFor = (d: Rehearsal) => (d.allSchools ? n.usual[ALL_SCHOOLS] : d.weekday === regularDay ? n.usual[regularDay] : undefined) || "none";
+
+  // All-school rehearsal dates as ranges, starting a new range after a break of more than four weeks.
+  const md = (id: string) => fmt(id, { month: "short", day: "numeric" });
+  const runs: string[][] = [];
+  for (const id of S.schedule.filter((d) => d.allSchools).map((d) => d.id)) {
+    const run = runs[runs.length - 1];
+    if (run && Date.parse(id) - Date.parse(run[run.length - 1]) <= 28 * 864e5) run.push(id);
+    else runs.push([id]);
+  }
+  const allSchoolDates = runs.map((r) => (r.length > 1 ? `${md(r[0])} – ${md(r[r.length - 1])}` : md(r[0]))).join(", ");
 
   const cover = (d: Rehearsal, leg: Leg) => {
     const dr = d[leg].drivers.find((x) => x.kids.includes(sel));
@@ -42,17 +55,18 @@ export default function MyChildPage() {
 
       <div className="card">
         <h3>{kidName(sel)}&apos;s usual rides</h3>
-        {weekdays.map((day) => (
-          <div className="field" key={day}>
-            <label>{day === "Wednesday" ? "All school Wednesday" : day} rehearsals</label>
-            <div className="seg" role="group" aria-label={`Usual ${day} ride`}>
-              {NEED_VALUES.map((v) => (
-                <button key={v} className={(n.usual[day] || "none") === v ? "on" : ""}
-                  onClick={() => act("/needs", { kidId: sel, usual: { [day]: v } }, "Usual rides updated")}>{NEED_LABEL[v]}</button>
-              ))}
-            </div>
+        <div className="field">
+          <label id="regular-day">Regular rehearsal day</label>
+          <div className="day-switch">
+            <span className={regularDay === "Tuesday" ? "on" : ""}>Tuesdays</span>
+            <button type="button" role="switch" aria-labelledby="regular-day" aria-checked={regularDay === "Wednesday"}
+              onClick={() => act("/needs", { kidId: sel, regularDay: otherDay }, `Regular day set to ${otherDay}s`)} />
+            <span className={regularDay === "Wednesday" ? "on" : ""}>Wednesdays</span>
           </div>
-        ))}
+        </div>
+        <UsualRow label={`${regularDay} rehearsals`} need={n.usual[regularDay]} onPick={(v) => act("/needs", { kidId: sel, usual: { [regularDay]: v } }, "Usual rides updated")} />
+        <UsualRow label={`All school Wednesday rehearsals${allSchoolDates && ` (${allSchoolDates})`}`} need={n.usual[ALL_SCHOOLS]}
+          onPick={(v) => act("/needs", { kidId: sel, usual: { [ALL_SCHOOLS]: v } }, "Usual rides updated")} />
       </div>
 
       <div className="card">
@@ -69,7 +83,7 @@ export default function MyChildPage() {
             <tbody>
               {S.schedule.filter((d) => !isPast(d.id)).map((d) => {
                 const ov = n.overrides[d.id];
-                const usual = n.usual[d.weekday] || "none";
+                const usual = usualFor(d);
                 return (
                   <tr key={d.id} className={ov ? "override" : ""}>
                     <td className="wk-date"><b>{shortDate(d.id)}</b>{d.note && <div className="muted" style={{ fontSize: ".8rem" }}>{d.note}</div>}</td>
@@ -87,6 +101,17 @@ export default function MyChildPage() {
             </tbody>
           </table>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function UsualRow({ label, need, onPick }: { label: string; need?: Need; onPick: (v: Need) => void }) {
+  return (
+    <div className="field">
+      <label>{label}</label>
+      <div className="seg" role="group" aria-label={`Usual ride, ${label}`}>
+        {NEED_VALUES.map((v) => <button key={v} className={(need || "none") === v ? "on" : ""} onClick={() => onPick(v)}>{NEED_LABEL[v]}</button>)}
       </div>
     </div>
   );

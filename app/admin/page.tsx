@@ -5,7 +5,7 @@ import { useSignedIn } from "@/lib/client/portal";
 import type { ImportantDate, RehearsalDate } from "@/lib/types";
 
 interface KidRow { id: number | null; name: string; parents: string } // id is null for a new child
-type DateRow = Pick<RehearsalDate, "id" | "note" | "flag">;
+type DateRow = Pick<RehearsalDate, "id" | "note" | "flag" | "allSchools">;
 const TEXT_FIELDS = [
   ["title", "Site title"], ["school", "School"], ["location", "Rehearsal location"],
   ["rehearsal", "Rehearsal time"], ["dropoffNote", "Drop-off note"], ["pickupNote", "Pickup note"],
@@ -21,7 +21,7 @@ export default function AdminPage() {
 
   const [kids, setKids] = useState<KidRow[]>(() => c.kids.map((k) => ({ id: k.id, name: k.name, parents: (k.parents || []).join(", ") })));
   const [admins, setAdmins] = useState((c.admins || []).join(", "));
-  const [dates, setDates] = useState<DateRow[]>(() => S.schedule.map((d) => ({ id: d.id, note: d.note, flag: d.flag })));
+  const [dates, setDates] = useState<DateRow[]>(() => S.schedule.map((d) => ({ id: d.id, note: d.note, flag: d.flag, allSchools: d.allSchools })));
   const [imp, setImp] = useState<ImportantDate[]>(() => c.importantDates.map((d) => ({ ...d })));
   const [text, setText] = useState<Record<TextField, string>>(() => Object.fromEntries(TEXT_FIELDS.map(([f]) => [f, c[f] || ""])) as Record<TextField, string>);
 
@@ -78,10 +78,11 @@ export default function AdminPage() {
             <select aria-label="Status" value={d.flag} onChange={(e) => update(dates, setDates, i, { flag: e.target.value as DateRow["flag"] })}>
               <option value="">Normal</option><option value="confirm">Needs confirming</option><option value="cancelled">Cancelled</option>
             </select>
+            <label className="check"><input type="checkbox" checked={d.allSchools} onChange={(e) => update(dates, setDates, i, { allSchools: e.target.checked })} /> All schools</label>
             <button className="btn link" onClick={() => remove(dates, setDates, i)}>Remove</button>
           </div>
         ))}
-        <button className="btn small ghost" onClick={() => setDates([...dates, { id: "", note: "", flag: "" }])}>+ Add rehearsal</button>
+        <button className="btn small ghost" onClick={() => setDates([...dates, { id: "", note: "", flag: "", allSchools: false }])}>+ Add rehearsal</button>
       </div>
 
       <div className="card">

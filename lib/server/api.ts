@@ -6,7 +6,7 @@ import {
   makeLinkToken, readLinkToken, makeSessionCookie, clearSessionCookie, sessionEmail, normEmail,
 } from "./auth";
 import {
-  LEGS, NEED_VALUES as NEEDS,
+  ALL_SCHOOLS, DEFAULT_REGULAR_DAY, LEGS, NEED_VALUES as NEEDS, REGULAR_DAYS,
   type Config, type Driver, type KidInfo, type KidNeeds, type Leg, type LegState, type Need, type Rehearsal, type RehearsalDate, type Ride,
 } from "../types";
 
@@ -38,7 +38,7 @@ async function loadConfig(c: Client): Promise<Cfg> {
     "SELECT id, name FROM kids ORDER BY position, id",
     "SELECT kp.kid_id, u.email FROM kid_parents kp JOIN users u ON u.id = kp.user_id ORDER BY kp.position, kp.id",
     "SELECT email FROM users WHERE is_admin = 1 ORDER BY email",
-    "SELECT id, date, note, flag FROM rehearsal_dates ORDER BY date",
+    "SELECT id, date, note, flag, all_schools FROM rehearsal_dates ORDER BY date",
     "SELECT date, title, detail FROM important_dates ORDER BY date, id",
   ], "read");
   const st = settings.rows[0];
@@ -47,22 +47,24 @@ async function loadConfig(c: Client): Promise<Cfg> {
     dropoffNote: str(st.dropoff_note), pickupNote: str(st.pickup_note),
     kids: kids.rows.map((k) => ({ id: Number(k.id), name: str(k.name), parents: parents.rows.filter((p) => p.kid_id === k.id).map((p) => str(p.email)) })),
     admins: admins.rows.map((a) => str(a.email)),
-    dates: dates.rows.map((d) => ({ id: str(d.date), weekday: weekdayOf(str(d.date)), note: str(d.note), flag: str(d.flag) as RehearsalDate["flag"] })),
+    dates: dates.rows.map((d) => ({ id: str(d.date), weekday: weekdayOf(str(d.date)), note: str(d.note), flag: str(d.flag) as RehearsalDate["flag"], allSchools: Number(d.all_schools) === 1 })),
     importantDates: important.rows.map((d) => ({ date: str(d.date), title: str(d.title), detail: str(d.detail) })),
     rehearsalId: Object.fromEntries(dates.rows.map((d) => [str(d.date), Number(d.id)])),
   };
 }
 
 async function loadNeeds(c: Client, cfg: Config, kidId?: number): Promise<Record<number, KidNeeds>> {
-  const [usual, overrides] = await c.batch([
+  const [usual, overrides, kids] = await c.batch([
     { sql: "SELECT kid_id, weekday, need FROM kid_usual_needs" + (kidId ? " WHERE kid_id = ?" : ""), args: kidId ? [kidId] : [] },
     {
       sql: "SELECT o.kid_id, r.date, o.need FROM kid_need_overrides o JOIN rehearsal_dates r ON r.id = o.rehearsal_id" + (kidId ? " WHERE o.kid_id = ?" : ""),
       args: kidId ? [kidId] : [],
     },
+    { sql: "SELECT id, regular_day FROM kids" + (kidId ? " WHERE id = ?" : ""), args: kidId ? [kidId] : [] },
   ], "read");
   const needs: Record<number, KidNeeds> = {};
-  for (const k of cfg.kids) if (!kidId || k.id === kidId) needs[k.id] = { usual: {}, overrides: {} };
+  for (const k of cfg.kids) if (!kidId || k.id === kidId) needs[k.id] = { usual: {}, overrides: {}, regularDay: "" };
+  for (const r of kids.rows) { const n = needs[Number(r.id)]; if (n) n.regularDay = str(r.regular_day); }
   for (const r of usual.rows) { const n = needs[Number(r.kid_id)]; if (n) n.usual[str(r.weekday)] = str(r.need) as Need; }
   for (const r of overrides.rows) { const n = needs[Number(r.kid_id)]; if (n) n.overrides[str(r.date)] = str(r.need) as Need; }
   return needs;
@@ -109,9 +111,13 @@ const isAdmin = (cfg: Config, email: string) => (cfg.admins || []).map(normEmail
 const kidsOf = (cfg: Config, email: string) => cfg.kids.filter((k) => (k.parents || []).map(normEmail).includes(email)).map((k) => k.id);
 const isAllowed = (cfg: Config, email: string) => isAdmin(cfg, email) || kidsOf(cfg, email).length > 0;
 
+// A kid's usual rides cover every all-school rehearsal and the regular rehearsals on their regular day.
+// A change for a single week applies on any date.
 function resolveNeed(needs: KidNeeds | undefined, date: RehearsalDate): Need {
   if (!needs) return "none";
-  return needs.overrides?.[date.id] || needs.usual?.[date.weekday] || "none";
+  if (needs.overrides?.[date.id]) return needs.overrides[date.id];
+  if (!date.allSchools && date.weekday !== (needs.regularDay || DEFAULT_REGULAR_DAY)) return "none";
+  return needs.usual?.[date.allSchools ? ALL_SCHOOLS : date.weekday] || "none";
 }
 const needsLeg = (need: Need, leg: Leg) => need === "both" || need === leg;
 
@@ -250,8 +256,12 @@ export async function handle(req: Request): Promise<Response> {
     if (!admin && !mine.includes(kid.id)) return fail(403, "You can only change rides for your own child.");
     const writes: InStatement[] = [];
     if (body.usual) for (const [day, v] of Object.entries(body.usual as Record<string, Need>)) {
-      if (!cfg.dates.some((d) => d.weekday === day) || !NEEDS.includes(v)) return fail(400, "Invalid value.");
+      if (!(day === ALL_SCHOOLS || REGULAR_DAYS.includes(day)) || !NEEDS.includes(v)) return fail(400, "Invalid value.");
       writes.push({ sql: "INSERT INTO kid_usual_needs (kid_id, weekday, need) VALUES (?, ?, ?) ON CONFLICT (kid_id, weekday) DO UPDATE SET need = excluded.need", args: [kid.id, day, v] });
+    }
+    if (body.regularDay !== undefined) {
+      if (!REGULAR_DAYS.includes(body.regularDay)) return fail(400, "Invalid value.");
+      writes.push({ sql: "UPDATE kids SET regular_day = ? WHERE id = ?", args: [body.regularDay, kid.id] });
     }
     if (body.overrides) for (const [date, v] of Object.entries(body.overrides as Record<string, Need | null | "">)) {
       if (!cfg.dates.some((d) => d.id === date)) return fail(400, "Unknown date.");
@@ -355,7 +365,7 @@ export async function handle(req: Request): Promise<Response> {
     if (Array.isArray(body.admins)) next.admins = [...new Set<string>(body.admins.map(normEmail).filter((e: string) => e.includes("@")))];
     if (Array.isArray(body.dates)) next.dates = [...new Map<string, RehearsalDate>(body.dates
       .filter((d: any) => /^\d{4}-\d{2}-\d{2}$/.test(d.id))
-      .map((d: any): [string, RehearsalDate] => [d.id, { id: d.id, weekday: weekdayOf(d.id), note: clean(d.note), flag: d.flag === "confirm" ? "confirm" : d.flag === "cancelled" ? "cancelled" : "" }])).values()]
+      .map((d: any): [string, RehearsalDate] => [d.id, { id: d.id, weekday: weekdayOf(d.id), note: clean(d.note), flag: d.flag === "confirm" ? "confirm" : d.flag === "cancelled" ? "cancelled" : "", allSchools: d.allSchools === true }])).values()]
       .sort((a: RehearsalDate, b: RehearsalDate) => a.id.localeCompare(b.id));
     if (Array.isArray(body.importantDates)) next.importantDates = body.importantDates
       .filter((d: any) => /^\d{4}-\d{2}-\d{2}$/.test(d.date) && clean(d.title))
@@ -391,7 +401,7 @@ export async function handle(req: Request): Promise<Response> {
       for (const t of ["car_kids", "cars", "kid_need_overrides"]) w.push({ sql: `DELETE FROM ${t} WHERE rehearsal_id = ?`, args: [cfg.rehearsalId[d.id]] });
       w.push({ sql: "DELETE FROM rehearsal_dates WHERE id = ?", args: [cfg.rehearsalId[d.id]] });
     }
-    for (const d of next.dates) w.push({ sql: "INSERT INTO rehearsal_dates (date, note, flag) VALUES (?, ?, ?) ON CONFLICT (date) DO UPDATE SET note = excluded.note, flag = excluded.flag", args: [d.id, d.note, d.flag] });
+    for (const d of next.dates) w.push({ sql: "INSERT INTO rehearsal_dates (date, note, flag, all_schools) VALUES (?, ?, ?, ?) ON CONFLICT (date) DO UPDATE SET note = excluded.note, flag = excluded.flag, all_schools = excluded.all_schools", args: [d.id, d.note, d.flag, d.allSchools ? 1 : 0] });
     w.push({ sql: "DELETE FROM important_dates", args: [] });
     for (const d of next.importantDates) w.push({ sql: "INSERT INTO important_dates (date, title, detail) VALUES (?, ?, ?)", args: [d.date, d.title, d.detail] });
     await c.batch(w, "write");

@@ -12,7 +12,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { normEmail } from "./auth";
 import { SEED_CONFIG, SEED_NEEDS, SEED_RIDES, type OldConfig, type OldRide } from "./seed";
-import { LEGS, NEED_VALUES, type KidNeeds, type Need } from "../types";
+import { ALL_SCHOOLS, LEGS, NEED_VALUES, type KidNeeds, type Need } from "../types";
 
 const ID = "id INTEGER PRIMARY KEY AUTOINCREMENT";
 const NEED = "need TEXT NOT NULL CHECK (need IN ('both', 'dropoff', 'pickup', 'none'))";
@@ -88,9 +88,27 @@ export function db(): Promise<Client> {
     await c.batch(SCHEMA, "write");
     const { rows } = await c.execute("SELECT 1 FROM settings");
     if (!rows.length) await fill(c);
+    await upgrade(c);
     await firstAdmins(c);
     return c;
   })().catch((err) => { ready = null; throw err; }));
+}
+
+// Changes made after the tables were first created (CREATE TABLE IF NOT EXISTS leaves existing tables alone).
+// Each runs once, the first time its column is missing. New databases are filled from the seed first, then upgraded.
+async function upgrade(c: Client) {
+  const columns = async (table: string) => (await c.execute(`PRAGMA table_info(${table})`)).rows.map((r) => String(r.name));
+  if (!(await columns("kids")).includes("regular_day")) {
+    await c.execute("ALTER TABLE kids ADD COLUMN regular_day TEXT NOT NULL DEFAULT ''");
+  }
+  if (!(await columns("rehearsal_dates")).includes("all_schools")) await c.batch([
+    "ALTER TABLE rehearsal_dates ADD COLUMN all_schools INTEGER NOT NULL DEFAULT 0",
+    // Until now every Wednesday was a combined all-school rehearsal, and usual needs were kept by weekday.
+    "UPDATE rehearsal_dates SET all_schools = 1 WHERE strftime('%w', date) = '3'",
+    `UPDATE kid_usual_needs SET weekday = '${ALL_SCHOOLS}' WHERE weekday = 'Wednesday'`,
+    // Each regular Tuesday gets a Wednesday for kids whose regular day is Wednesday.
+    "INSERT OR IGNORE INTO rehearsal_dates (date, note) SELECT date(date, '+1 day'), 'Wednesday (Non Park View day)' FROM rehearsal_dates WHERE strftime('%w', date) = '2'",
+  ], "write");
 }
 
 // Admins are users with is_admin = 1, managed in Admin. ADMIN_EMAILS only matters while nobody is an admin
