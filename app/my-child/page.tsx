@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useState } from "react";
 import { useSignedIn } from "@/lib/client/portal";
 import { fmt, isPast, NEED_LABEL, shortDate } from "@/lib/client/format";
@@ -86,7 +87,7 @@ export default function MyChildPage() {
                 const usual = usualFor(d);
                 return (
                   <tr key={d.id} className={ov ? "override" : ""}>
-                    <td className="wk-date"><b>{shortDate(d.id)}</b>{d.note && <div className="muted" style={{ fontSize: ".8rem" }}>{d.note}</div>}</td>
+                    <td className="wk-date"><Link href={`/schedule?d=${d.id}`} aria-label={`Open ${shortDate(d.id)} on the schedule`}><b>{shortDate(d.id)}</b></Link>{d.note && <div className="muted" style={{ fontSize: ".8rem" }}>{d.note}</div>}</td>
                     <td className="wk-need">
                       <select aria-label={`Ride needed ${d.id}`} value={ov || ""} onChange={(e) => act("/needs", { kidId: sel, overrides: { [d.id]: e.target.value || null } }, "Week updated")}>
                         <option value="">Usual ({NEED_LABEL[usual]})</option>

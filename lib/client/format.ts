@@ -1,5 +1,5 @@
 // Date and display helpers for the browser.
-import type { Leg, Need, Rehearsal, Driver } from "../types";
+import type { Leg, Need, Driver } from "../types";
 
 export const NEED_LABEL: Record<Need, string> = {
   both: "Drop-off & pickup",
@@ -28,10 +28,6 @@ export function todayId(): string {
 export const isPast = (id: string) => id < todayId();
 
 export const openSeats = (drivers: Driver[]) => drivers.reduce((t, x) => t + Math.max(0, x.seats - x.kids.length), 0);
-
-/** More kids still need a ride than there are open seats on this leg. */
-export const legShort = (d: Rehearsal, leg: Leg) => d[leg].stillNeed.length > openSeats(d[leg].drivers);
-export const needsDriver = (d: Rehearsal) => legShort(d, "dropoff") || legShort(d, "pickup");
 
 export function initials(nameOrEmail: string): string {
   const base = nameOrEmail.split("@")[0].replace(/[._-]+/g, " ").trim();

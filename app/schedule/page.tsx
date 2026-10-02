@@ -2,15 +2,14 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useSignedIn } from "@/lib/client/portal";
-import { isPast, needsDriver } from "@/lib/client/format";
+import { isPast } from "@/lib/client/format";
 import { RehearsalCard } from "@/components/Rehearsal";
 import { DEFAULT_REGULAR_DAY, LEGS, type Rehearsal } from "@/lib/types";
 
-type Filter = "all" | "needs" | "mine" | "kids";
-const FILTERS: [Filter, string][] = [["all", "All"], ["needs", "Needs drivers"], ["mine", "My rides"], ["kids", "My child's schedule"]];
+type Filter = "all" | "kids" | "mine";
+const FILTERS: [Filter, string][] = [["all", "All"], ["kids", "My child's schedule"], ["mine", "My rides"]];
 const EMPTY: Record<Filter, string> = {
   all: "No rehearsals to show.",
-  needs: "Every upcoming rehearsal has enough drivers.",
   mine: "You haven't signed up to drive for any upcoming rehearsals yet. Tap I can drive on a rehearsal to volunteer.",
   kids: "Your child doesn't have any upcoming rehearsals.",
 };
@@ -19,17 +18,18 @@ export default function SchedulePage() {
   return <Suspense fallback={<div className="wrap loading">Loading…</div>}><ScheduleFromUrl /></Suspense>;
 }
 
-// /schedule?f=mine (menu button) and /schedule?d=2026-10-13 (upcoming list).
+// /schedule?f=mine (menu button), /schedule?f=all (home page) and /schedule?d=2026-10-13 (upcoming list).
 // Keyed on the query so following one of those links again resets the view.
 function ScheduleFromUrl() {
   const params = useSearchParams();
   const f = params.get("f") as Filter | null;
-  return <Schedule key={params.toString()} jumpTo={params.get("d")} initialFilter={f && f in EMPTY ? f : "all"} />;
+  return <Schedule key={params.toString()} jumpTo={params.get("d")} initialFilter={f && f in EMPTY ? f : null} />;
 }
 
-function Schedule({ jumpTo, initialFilter }: { jumpTo: string | null; initialFilter: Filter }) {
+// Opens on My child's schedule for parents, All for everyone else (and when jumping to a date).
+function Schedule({ jumpTo, initialFilter }: { jumpTo: string | null; initialFilter: Filter | null }) {
   const { S } = useSignedIn();
-  const [filter, setFilter] = useState<Filter>(jumpTo ? "all" : initialFilter);
+  const [filter, setFilter] = useState<Filter>(jumpTo ? "all" : initialFilter ?? (S.me.kids.length ? "kids" : "all"));
   const [highlight, setHighlight] = useState<string | null>(jumpTo);
 
   useEffect(() => {
@@ -54,7 +54,6 @@ function Schedule({ jumpTo, initialFilter }: { jumpTo: string | null; initialFil
   });
 
   let list = S.schedule.filter((d) => !isPast(d.id));
-  if (filter === "needs") list = list.filter(needsDriver);
   if (filter === "mine") list = list.filter(isMine);
   if (filter === "kids") list = list.filter(isKids);
 

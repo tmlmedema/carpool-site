@@ -52,7 +52,7 @@ export default function HomePage() {
           <>
             <div className="upcoming-head"><h2 className="section-title">Upcoming rehearsals</h2></div>
             <div className="card upcoming">{upcoming.map((d) => <UpcomingRow key={d.id} d={d} />)}</div>
-            <p className="upcoming-foot"><Link className="btn gold" href="/schedule">View full schedule</Link></p>
+            <p className="upcoming-foot"><Link className="btn gold" href="/schedule?f=all">View full schedule</Link></p>
           </>
         )}
       </div>

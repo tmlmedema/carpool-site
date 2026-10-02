@@ -214,6 +214,8 @@ tr.override td { background: #fffaea; }
 /* admin */
 .edit-row { display: grid; gap: 8px; align-items: center; margin-bottom: 8px; }
 .edit-kids { grid-template-columns: 1fr 2fr auto; }
+.wk-date a { text-decoration-color: var(--gold-deep); text-underline-offset: 3px; }
+.wk-date a:hover { color: var(--blue); }
 .edit-dates { grid-template-columns: 170px 1fr 150px auto auto; }
 .edit-imp { grid-template-columns: 170px 1fr 1.4fr auto; }
 
@@ -250,8 +252,7 @@ dialog::backdrop { background: rgba(0,0,0,.55); }
   /* segmented buttons: equal tiles instead of ragged wrapping */
   .seg { display: grid; grid-template-columns: 1fr 1fr; width: 100%; background: var(--ink); gap: 1px; }
   .seg button, .seg button + button { border: 0; text-align: center; padding: 11px 8px; }
-  .filter-seg { grid-template-columns: repeat(3, 1fr); }
-  .filter-seg:has(> :nth-child(4)) { grid-template-columns: 1fr 1fr; }
+  .filter-seg { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 1fr; }
   .filters { width: 100%; }
 }
 @media (max-width: 760px) {
