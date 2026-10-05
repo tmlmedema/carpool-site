@@ -14,6 +14,7 @@ const NAV = [
   { href: "/schedule", label: "Carpool Schedule" },
   { href: "/my-child", label: "My Child's Schedule" },
   { href: "/dates", label: "Important Dates" },
+  { href: "/faq", label: "FAQ" },
 ];
 
 export default function Shell({ children }: { children: ReactNode }) {

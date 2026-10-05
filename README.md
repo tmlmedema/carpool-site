@@ -13,6 +13,7 @@ app/
   schedule/page.tsx     Carpool Schedule (filters, drive sign-up, ?d=<date> jump, ?f=mine)
   my-child/page.tsx     My Child's Rides (usual rides, weekly changes, home address)
   dates/page.tsx        Important Dates
+  faq/page.tsx          FAQ (rides, driving, sign-in)
   admin/page.tsx        Admin (families + emails, admins, dates, site text, CSV export)
   api/[...path]/route.ts  every /api/* request → lib/server/api.ts
   globals.css           all styles (Park View black & yellow)
