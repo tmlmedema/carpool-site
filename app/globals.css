@@ -203,6 +203,17 @@ tr.override td { background: #fffaea; }
 .date-list { list-style: none; margin: 0; padding: 0; }
 .date-list li { display: flex; gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--line); align-items: center; }
 
+/* faq */
+.faq details { border-top: 1px solid var(--line); }
+.faq details:last-child { border-bottom: 1px solid var(--line); }
+.faq summary { cursor: pointer; list-style: none; display: flex; justify-content: space-between; gap: 12px; padding: 12px 2px; font-weight: 600; }
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after { content: "+"; font: 600 1.2rem/1 var(--font-display); color: var(--gold-deep); }
+.faq details[open] summary::after { content: "\2212"; }
+.faq summary:hover { color: var(--blue); }
+.faq summary:focus-visible { outline: 3px solid var(--gold-deep); outline-offset: 2px; }
+.faq details p { margin: 0 0 14px; max-width: 70ch; color: var(--text); }
+
 /* admin */
 .edit-row { display: grid; gap: 8px; align-items: center; margin-bottom: 8px; }
 .edit-kids { grid-template-columns: 1fr 2fr auto; }
