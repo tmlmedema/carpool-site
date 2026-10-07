@@ -1,3 +1,4 @@
+//TODO: Add favicon and meta tags for social sharing
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { PortalProvider } from "@/lib/client/portal";
