@@ -36,7 +36,8 @@ function Schedule({ jumpTo, initialFilter }: { jumpTo: string | null; initialFil
     if (!jumpTo) return;
     const raf = requestAnimationFrame(() => {
       const el = document.getElementById(`r-${jumpTo}`);
-      if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 16, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+      const headerH = document.querySelector(".site-header")?.getBoundingClientRect().height ?? 0;
+      if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - headerH - 16, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
     });
     const t = setTimeout(() => setHighlight(null), 2200);
     return () => { cancelAnimationFrame(raf); clearTimeout(t); };
