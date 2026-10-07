@@ -1,8 +1,8 @@
 "use client";
 import Link from "next/link";
 import { useState } from "react";
-import { useSignedIn } from "@/lib/client/portal";
-import { goesTo, isPast, weekEndOf } from "@/lib/client/format";
+import { useMinuteTick, useSignedIn } from "@/lib/client/portal";
+import { goesTo, isOver, weekEndOf } from "@/lib/client/format";
 import { RehearsalCard, UpcomingRow } from "@/components/Rehearsal";
 
 // "Only show my child's schedule" is off until a parent turns it on; the choice is remembered in this browser.
@@ -13,6 +13,7 @@ function readOnlyMine(email: string) {
 
 export default function HomePage() {
   const { S } = useSignedIn();
+  useMinuteTick();
   const c = S.config;
   const hasKids = S.me.kids.length > 0;
   const [onlyMine, setOnlyMine] = useState(() => readOnlyMine(S.me.email));
@@ -22,7 +23,7 @@ export default function HomePage() {
     try { localStorage.setItem(onlyMineKey(S.me.email), on ? "on" : "off"); } catch {}
   };
 
-  const shown = S.schedule.filter((d) => !isPast(d.id) && (!hasKids || !onlyMine || S.me.kids.some((k) => goesTo(S.needs[k], d))));
+  const shown = S.schedule.filter((d) => !isOver(d.id) && (!hasKids || !onlyMine || S.me.kids.some((k) => goesTo(S.needs[k], d))));
   const next = shown[0];
   // The next rehearsal and any others later that week (Sunday to Saturday), like a Tuesday and Wednesday.
   const weekEnd = next ? weekEndOf(next.id) : "";

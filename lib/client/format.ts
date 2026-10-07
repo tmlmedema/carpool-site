@@ -26,6 +26,8 @@ export function todayId(): string {
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 }
 export const isPast = (id: string) => id < todayId();
+/** A rehearsal is over (hidden from lists) once its date has passed, or at 10 PM on the day itself. */
+export const isOver = (id: string) => isPast(id) || (id === todayId() && new Date().getHours() >= 22);
 
 /** A child goes to their regular day's rehearsals, every all-school rehearsal, and any other week a ride was asked for. */
 export function goesTo(n: KidNeeds | undefined, d: RehearsalDate): boolean {

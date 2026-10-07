@@ -1,8 +1,8 @@
 "use client";
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { useSignedIn } from "@/lib/client/portal";
-import { goesTo, isPast } from "@/lib/client/format";
+import { useMinuteTick, useSignedIn } from "@/lib/client/portal";
+import { goesTo, isOver } from "@/lib/client/format";
 import { RehearsalCard } from "@/components/Rehearsal";
 import { LEGS, type Rehearsal } from "@/lib/types";
 
@@ -29,6 +29,7 @@ function ScheduleFromUrl() {
 // Opens on My child's schedule for parents, All for everyone else (and when jumping to a date).
 function Schedule({ jumpTo, initialFilter }: { jumpTo: string | null; initialFilter: Filter | null }) {
   const { S } = useSignedIn();
+  useMinuteTick();
   const [filter, setFilter] = useState<Filter>(jumpTo ? "all" : initialFilter ?? (S.me.kids.length ? "kids" : "all"));
   const [highlight, setHighlight] = useState<string | null>(jumpTo);
 
@@ -49,7 +50,7 @@ function Schedule({ jumpTo, initialFilter }: { jumpTo: string | null; initialFil
   const hasKids = S.me.kids.length > 0;
   const isKids = (d: Rehearsal) => S.me.kids.some((k) => goesTo(S.needs[k], d));
 
-  let list = S.schedule.filter((d) => !isPast(d.id));
+  let list = S.schedule.filter((d) => !isOver(d.id));
   if (filter === "mine") list = list.filter(isMine);
   if (filter === "kids") list = list.filter(isKids);
 

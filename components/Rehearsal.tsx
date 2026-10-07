@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useSignedIn } from "@/lib/client/portal";
-import { fmt, isPast, LEG_LABEL, longDate, mapsLink, openSeats, routeLink, SEATS } from "@/lib/client/format";
+import { fmt, isOver, LEG_LABEL, longDate, mapsLink, openSeats, routeLink, SEATS } from "@/lib/client/format";
 import type { Driver, Leg, Rehearsal } from "@/lib/types";
 import { ProfileForm } from "./ProfileForm";
 
@@ -46,7 +46,7 @@ export function UpcomingRow({ d }: { d: Rehearsal }) {
 }
 
 export function RehearsalCard({ d, highlight = false }: { d: Rehearsal; highlight?: boolean }) {
-  const past = isPast(d.id);
+  const past = isOver(d.id);
   return (
     <article className={`card rehearsal${past ? " past" : ""}${highlight ? " jump" : ""}`} data-date={d.id} id={`r-${d.id}`}>
       <div className="rh-head">
