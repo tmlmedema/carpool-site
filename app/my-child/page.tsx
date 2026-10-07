@@ -1,12 +1,13 @@
 "use client";
 import Link from "next/link";
 import { useState } from "react";
-import { useSignedIn } from "@/lib/client/portal";
-import { fmt, isPast, NEED_LABEL, shortDate } from "@/lib/client/format";
+import { useMinuteTick, useSignedIn } from "@/lib/client/portal";
+import { fmt, isOver, NEED_LABEL, shortDate } from "@/lib/client/format";
 import { ALL_SCHOOLS, DEFAULT_REGULAR_DAY, NEED_VALUES, REGULAR_DAYS, type Leg, type Need, type Rehearsal } from "@/lib/types";
 
 export default function MyChildPage() {
   const { S, act } = useSignedIn();
+  useMinuteTick();
   const kids = S.me.isAdmin ? S.config.kids.map((k) => k.id) : S.me.kids;
   const [picked, setPicked] = useState(kids[0]);
   const sel = kids.includes(picked) ? picked : kids[0];
@@ -82,7 +83,7 @@ export default function MyChildPage() {
           <table className="week-table">
             <thead><tr><th>Date</th><th>Ride needed</th><th>Drop-off</th><th>Pickup</th></tr></thead>
             <tbody>
-              {S.schedule.filter((d) => !isPast(d.id)).map((d) => {
+              {S.schedule.filter((d) => !isOver(d.id)).map((d) => {
                 const ov = n.overrides[d.id];
                 const usual = usualFor(d);
                 return (

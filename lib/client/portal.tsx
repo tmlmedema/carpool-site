@@ -46,6 +46,14 @@ export const useSignedIn = () => {
   const c = usePortal();
   return { ...c, S: c.S as PortalState };
 };
+/** Re-render once a minute, so lists drop a rehearsal at its cutoff (see isOver) while the page stays open. */
+export function useMinuteTick() {
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setTick((n) => n + 1), 60_000);
+    return () => clearInterval(t);
+  }, []);
+}
 
 export function PortalProvider({ children }: { children: ReactNode }) {
   const [S, setS] = useState<PortalState | null>(null);
