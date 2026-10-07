@@ -48,7 +48,7 @@ export default function HomePage() {
           <Link className="cta" href="/dates"><h3>Important<br />Dates</h3><span className="more">See the calendar.</span></Link>
         </div>
         <div className="section-head">
-          <h2 className="section-title">This week</h2>
+          <h2 className="section-title">Next Rehearsal</h2>
           {hasKids && (
             <label className="switch-label">
               Only show my child&apos;s schedule
@@ -60,7 +60,7 @@ export default function HomePage() {
           : <div className="card">{hasKids && onlyMine ? "Your child has no more rehearsals this season." : "No more rehearsals this season."}</div>}
         {upcoming.length > 0 && (
           <>
-            <div className="section-head"><h2 className="section-title">Upcoming rehearsals</h2></div>
+            <div className="section-head"><h2 className="section-title">Coming Up</h2></div>
             <div className="card upcoming">{upcoming.map((d) => <UpcomingRow key={d.id} d={d} />)}</div>
             <p className="upcoming-foot"><Link className="btn gold" href="/schedule?f=all">View full schedule</Link></p>
           </>
