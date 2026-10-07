@@ -26,6 +26,8 @@ const json = (data: unknown, status = 200, headers: Record<string, string> = {})
 const fail = (status: number, error: string) => json({ error }, status);
 const clean = (s: unknown, max = 200) => String(s ?? "").replace(/[\u0000-\u001f]/g, " ").trim().slice(0, max);
 const str = (v: unknown) => (v == null ? "" : String(v));
+// The school's time zone, for deciding which rehearsals are still upcoming.
+const SCHOOL_TZ = "America/Chicago";
 const weekdayOf = (date: string) => new Date(date + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "long", timeZone: "UTC" });
 
 // ---------- reading ----------
@@ -271,7 +273,19 @@ export async function handle(req: Request): Promise<Response> {
       else return fail(400, "Invalid value.");
     }
     if (writes.length) await c.batch(writes, "write");
-    return json({ ok: true, needs: (await loadNeeds(c, cfg, kid.id))[kid.id] });
+    const needs = (await loadNeeds(c, cfg, kid.id))[kid.id];
+    // Take the child out of any upcoming car for a ride they no longer need (e.g. switched to "No ride needed").
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: SCHOOL_TZ });
+    const seats = await c.execute({
+      sql: "SELECT ck.id, r.date, ck.leg FROM car_kids ck JOIN rehearsal_dates r ON r.id = ck.rehearsal_id WHERE ck.kid_id = ? AND r.date >= ?",
+      args: [kid.id, today],
+    });
+    const leave = seats.rows.filter((r) => {
+      const d = cfg.dates.find((x) => x.id === str(r.date));
+      return d && !needsLeg(resolveNeed(needs, d), str(r.leg) as Leg);
+    });
+    if (leave.length) await c.batch(leave.map((r) => ({ sql: "DELETE FROM car_kids WHERE id = ?", args: [r.id] })), "write");
+    return json({ ok: true, needs });
   }
 
   if (route.startsWith("/rides/") && method === "POST") {
@@ -329,7 +343,8 @@ export async function handle(req: Request): Promise<Response> {
         const driverEmail = normEmail(body.driver || email);
         const drv = cars.find((d) => d.email === driverEmail);
         if (!drv) return fail(400, "Sign up to drive first.");
-        if (!canManage(drv)) return fail(403, "You can only change your own car.");
+        // A parent can always take their own child out of a car; adding a child still needs the car's driver (or an admin).
+        if (!canManage(drv) && !(body.add === false && mine.includes(kid.id))) return fail(403, "You can only change your own car.");
         if (body.add === false) await c.execute({ sql: "DELETE FROM car_kids WHERE car_id = ? AND kid_id = ?", args: [drv.id, kid.id] });
         else {
           const other = cars.find((d) => d.kids.includes(kid.id));

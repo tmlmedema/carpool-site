@@ -115,3 +115,20 @@ console.log("All API tests passed ✔");
   assert.equal((await call(a3, "/state")).data.kidInfo[K.victoria].address, "9 Oak Ave, Lombard", "admin sees it");
   console.log("Address tests passed ✔");
 }
+
+// --- parents can take their own child out of a car, and "No ride needed" takes them out automatically ---
+{
+  const pat = await login("pat@example.com");
+  const vic = await login("vic@example.com");
+  const car = async () => (await call(pat, "/state")).data.schedule.find((d) => d.id === "2026-11-10").pickup.drivers.find((x) => x.email === "pat@example.com");
+  assert.ok((await car()).kids.includes(K.victoria), "Victoria starts in Pat's car");
+  assert.equal((await call(vic, "/rides/claim", { date: "2026-11-10", leg: "pickup", kidId: K.will, driver: "pat@example.com", add: false })).status, 403, "can't remove someone else's child");
+  assert.equal((await call(vic, "/rides/claim", { date: "2026-11-10", leg: "pickup", kidId: K.victoria, driver: "pat@example.com", add: true })).status, 403, "can't add to someone else's car");
+  assert.equal((await call(vic, "/rides/claim", { date: "2026-11-10", leg: "pickup", kidId: K.victoria, driver: "pat@example.com", add: false })).status, 200, "parent removes own child");
+  assert.ok(!(await car()).kids.includes(K.victoria));
+  await call(pat, "/rides/claim", { date: "2026-11-10", leg: "pickup", kidId: K.victoria });
+  assert.ok((await car()).kids.includes(K.victoria), "back in the car");
+  assert.equal((await call(vic, "/needs", { kidId: K.victoria, overrides: { "2026-11-10": "dropoff" } })).status, 200);
+  assert.ok(!(await car()).kids.includes(K.victoria), "switching to drop-off only takes her out of the pickup car");
+  console.log("Remove-from-car tests passed ✔");
+}

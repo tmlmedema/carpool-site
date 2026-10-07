@@ -123,7 +123,7 @@ function LegBlock({ d, leg, past }: { d: Rehearsal; leg: Leg; past: boolean }) {
               {x.kids.length ? x.kids.map((k) => (
                 <span key={k} className="kid">
                   {kidName(k)}
-                  {canEdit && <button className="x" aria-label={`Remove ${kidName(k)}`} onClick={() => act("/rides/claim", { date: d.id, leg, kidId: k, driver: x.email, add: false }, "Removed")}>×</button>}
+                  {(canEdit || (!past && S.me.kids.includes(k))) && <button className="x" aria-label={`Remove ${kidName(k)}`} onClick={() => act("/rides/claim", { date: d.id, leg, kidId: k, driver: x.email, add: false }, "Removed")}>×</button>}
                 </span>
               )) : <span className="muted" style={{ fontSize: ".88rem" }}>No kids yet</span>}
             </div>
